@@ -55,6 +55,7 @@ input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px soli
 .row label{font-size:14px}
 .btn{font:inherit;font-weight:900;font-size:18px;border:0;border-radius:14px;padding:16px;cursor:pointer;color:var(--signink);background:var(--lamp);letter-spacing:.06em}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:700;font-size:15px;padding:12px}
+.opt{font-size:13px;letter-spacing:.2em;color:var(--muted);margin:28px 0 -4px;padding-top:18px;border-top:1px solid var(--line)}
 .hint{font-size:12px;color:var(--muted);margin:0;line-height:1.6}
 
 /* play */
@@ -100,6 +101,9 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
 .heard.off .dot{background:var(--muted);animation:none}
 .heard .line1{display:flex;align-items:center;gap:10px}
 .mic{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mictest{display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.mictest .mtheard{margin:0;font-size:15px;min-height:1.5em}
+.mictest .st.err{color:var(--miss)}
 .mic .tag{letter-spacing:.12em;font-weight:700}
 .micbar{flex:1;height:8px;background:var(--line);border-radius:99px;overflow:hidden;min-width:60px}
 .micbar i{display:block;height:100%;width:0;background:var(--ok);transition:width .05s linear}
@@ -155,6 +159,11 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <button class="btn ghost" id="addP" type="button">＋ 乗客を追加</button>
     </div>
 
+    <button class="btn" id="startBtn" type="button">出発進行！</button>
+    <p class="hint" id="setupMsg" aria-live="polite"></p>
+
+    <h2 class="opt">オプション</h2>
+
     <div class="card">
       <h2>路線（出題ジャンル）</h2>
       <div class="chips" id="cats"></div>
@@ -171,6 +180,11 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <div class="row"><label>音声認識の場所</label><div class="chips" id="recWhere"></div></div>
       <div class="filebox"><span class="hint" id="localStatus">端末内の音声認識を確認しています…</span><button class="chip" id="installBtn" type="button" hidden>日本語データを入れる</button></div>
       <div class="row"><label>マイク入力バー（診断用）</label><div class="chips" id="meterMode"></div></div>
+      <div class="row"><label>マイクテスト</label><button class="chip" id="micTestBtn" type="button">テスト開始</button></div>
+      <div class="mictest" id="micTest" hidden>
+        <div class="mic"><span class="tag">MIC</span><div class="micbar" id="mtBar"><i id="mtLevel"></i></div><span class="st" id="mtState">準備中…</span></div>
+        <p class="mtheard" id="mtHeard">何か話してみてください（例：「東京大学」）</p>
+      </div>
     </div>
 
     <div class="card">
@@ -187,8 +201,6 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <p class="hint">身内ネタや社内用語を入れると盛り上がります。ここに書いた問題はオリジナル路線として出題されます。音声判定で別の言い方も正解にしたいときは「|」で区切ります（例：朝会=朝のミーティング|朝礼）。</p>
     </div>
 
-    <button class="btn" id="startBtn" type="button">出発進行！</button>
-    <p class="hint" id="setupMsg" aria-live="polite"></p>
   </section>
 
   <!-- PLAY -->
@@ -788,6 +800,66 @@ function ask(abbr,then){
 }
 function stopTTS(){try{TTS&&TTS.cancel()}catch(e){}}
 
+/* ---------- マイクテスト（最初の画面） ---------- */
+/* ゲームを始める前に、マイクの音が届くか・音声認識が文字を返すかを確かめる。20秒で自動的に止まる */
+let mt=null;
+function mtStat(t,err){const el=$("mtState");el.textContent=t;el.classList.toggle("err",!!err)}
+function stopMicTest(){
+  if(!mt)return;const m=mt;mt=null;
+  clearTimeout(m.autoT);clearTimeout(m.audioT);cancelAnimationFrame(m.raf);
+  try{m.rec&&m.rec.abort()}catch(e){}
+  if(m.stream)m.stream.getTracks().forEach(t=>t.stop());
+  try{m.ctx&&m.ctx.close()}catch(e){}
+  $("micTestBtn").textContent="テスト開始";$("mtLevel").style.width="0";
+}
+function startMicTest(){
+  stopMicTest();
+  const m=mt={};$("micTest").hidden=false;$("micTestBtn").textContent="テスト終了";
+  $("mtHeard").textContent="何か話してみてください（例：「東京大学」）";mtStat("マイクを準備中…");
+  m.autoT=setTimeout(()=>{if(mt===m){stopMicTest();mtStat("テストを終了しました（20秒）")}},20000);
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){mtStat("このブラウザではマイクを使えません",true);return}
+  /* マイクを開く処理が返ってこないとき（Chrome の音声処理が固まっているとき）に知らせる */
+  m.audioT=setTimeout(()=>{if(mt===m&&!m.stream)mtStat("マイクを開けません。Chrome を完全に終了して起動し直してください",true)},5000);
+  navigator.mediaDevices.getUserMedia({audio:true}).then(st=>{
+    if(mt!==m){st.getTracks().forEach(t=>t.stop());return}
+    m.stream=st;clearTimeout(m.audioT);
+    try{
+      m.ctx=new (window.AudioContext||window.webkitAudioContext)();m.ctx.resume();
+      const an=m.ctx.createAnalyser();an.fftSize=512;m.ctx.createMediaStreamSource(st).connect(an);
+      const buf=new Float32Array(an.fftSize);let peak=0;
+      const loop=()=>{
+        if(mt!==m)return;
+        an.getFloatTimeDomainData(buf);let sum=0;for(let i=0;i<buf.length;i++)sum+=buf[i]*buf[i];
+        const db=20*Math.log10(Math.sqrt(sum/buf.length)+1e-8),lv=Math.max(0,Math.min(1,(db+60)/50));
+        peak=Math.max(lv,peak*0.92);$("mtLevel").style.width=(peak*100).toFixed(0)+"%";$("mtBar").classList.toggle("hot",peak>0.85);
+        m.raf=requestAnimationFrame(loop);
+      };loop();
+    }catch(e){}
+    if(!SR){mtStat("マイクは使えますが、このブラウザは音声認識に対応していません",true);return}
+    mtRec(m,useLocal());
+  }).catch(e=>{if(mt===m){clearTimeout(m.audioT);mtStat("マイクを使えません（"+(e&&e.name||"不明")+"）。ブラウザのマイクの許可を確かめてください",true)}});
+}
+/* 端末内認識が起動直後に止まり続けたら（3回）、ゲーム本番と同じくクラウドに切り替える */
+function mtRec(m,local){
+  let r;try{r=m.rec=new SR()}catch(e){mtStat("音声認識を起動できません",true);return}
+  const where=local?"端末内":"クラウド";let quick=0,lastErr="",startAt=0;
+  r.lang="ja-JP";r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
+  if(local){try{r.processLocally=true}catch(e){}}
+  r.onstart=()=>{startAt=performance.now();mtStat("認識：動作中（"+where+"）")};
+  r.onaudiostart=()=>mtStat("認識：マイク受信中（"+where+"）");
+  r.onspeechstart=()=>mtStat("認識：声を検出（"+where+"）");
+  r.onresult=e=>{quick=0;let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;$("mtHeard").textContent=t?"「"+t+"」":"聞き取り中…";mtStat("認識：文字が返ってきました（"+where+"）")};
+  r.onerror=ev=>{lastErr=ev.error;if(ev.error!=="aborted"&&ev.error!=="no-speech")mtStat("エラー："+ev.error+"（"+where+"）",true)};
+  r.onend=()=>{
+    if(mt!==m||m.rec!==r)return;
+    quick=performance.now()-startAt<1000?quick+1:0;
+    if(local&&quick>=3){mtStat("端末内認識が起動直後に止まるため、クラウドに切り替えました"+(lastErr?"（直前のエラー："+lastErr+"）":""),true);mtRec(m,false);return}
+    setTimeout(()=>{if(mt===m&&m.rec===r){try{r.start()}catch(e){}}},quick?Math.min(2000,100*Math.pow(2,quick-1)):0);
+  };
+  try{r.start()}catch(e){mtStat("音声認識を起動できません",true)}
+}
+$("micTestBtn").onclick=()=>{mt?(stopMicTest(),mtStat("テストを終了しました")):startMicTest()};
+
 /* ---------- マイク入力バー（診断用） ---------- */
 let meterStream=null,meterRaf=0;
 function startMeter(){
@@ -879,6 +951,7 @@ function arrangeDeck(items){
 function buildDeck(){return arrangeDeck([...Q,...customQs()].filter(q=>cfg.cats.includes(q[2])))}
 
 function start(){
+  stopMicTest();
   const names=cfg.players.map((n,i)=>n.trim()||("乗客"+(i+1)));
   if(names.length<2){$("setupMsg").textContent="乗客は2人以上にしてください。";return}
   const deck=buildDeck();
