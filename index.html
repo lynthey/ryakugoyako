@@ -151,7 +151,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <h2>ルール</h2>
       <div class="row"><label for="bpm">テンポ（BPM）</label>
         <div class="bpmrow"><input type="range" id="bpm" min="80" max="200" step="1"><b id="bpmVal"></b><button class="chip" id="tapBtn" type="button">タップで測る</button></div></div>
-      <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げます。読み上げ中はマイクを止め、読み終わった瞬間から回答できます。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
+      <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げます。読み上げ中の音は判定に使わず、読み終わった瞬間から回答を受け付けます。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
       <div class="row"><label>何回ミスで終点？</label><div class="chips" id="lives"></div></div>
       <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
       <p class="hint" id="judgeHint"></p>
@@ -547,7 +547,6 @@ function unlockTTS(){
 /* 略語を読み上げ、終わったら then を呼ぶ。読み上げ非対応やオフのときはすぐ呼ぶ */
 function ask(abbr,then){
   if(!TTS||!cfg.tts){then();return}
-  pauseRec();
   let fired=false;const go=()=>{if(fired)return;fired=true;clearTimeout(guard);then()};
   /* 読み上げが終わった通知が来ない端末のため、4拍で打ち切る */
   const guard=setTimeout(go,4*60000/cfg.bpm);
@@ -718,7 +717,7 @@ function grade(said,ans){
 }
 function matches(said,ans){return grade(said,ans)>0}
 const FILLERS=["えー","えーと","えっと","あー","あの","あのー","うーん","んー","えっ","ええと","なんだっけ"].map(x=>x);
-let rec=null,recActive=false,recFinal=0;
+let rec=null,recActive=false,recFinal=0,recPending="";
 function voiceOn(){return cfg.judge==="voice"&&SR&&!voiceBroken}
 /* 音声認識はゲーム中ずっと動かし続ける。問題ごとに止めて起動し直すと、立ち上がりの0.5〜1秒を聞き逃すため */
 function ensureRec(){
@@ -726,16 +725,21 @@ function ensureRec(){
   try{rec=new SR()}catch(e){voiceFail();return}
   rec.lang="ja-JP";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=5;recActive=true;recFinal=0;
   const r=rec;
-  r.onstart=()=>{recFinal=0;if(G)G.base=0};
+  r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""}};
   r.onresult=e=>{
     if(r!==rec)return;
     /* 確定した結果の数を数えておく（次の問題はここから先だけを見る） */
     let f=0;while(f<e.results.length&&e.results[f].isFinal)f++;recFinal=f;
+    /* まだ確定していない途中の文字（読み上げ中に聞こえた分）を覚えておく */
+    recPending="";for(let i=f;i<e.results.length;i++)recPending+=e.results[i][0].transcript;
+    /* 読み上げ中（聞き取り前）の結果は判定に使わない */
     if(!G||G.lock||!G.hearing)return;
     const from=Math.min(G.base||0,e.results.length);
     const cands=[];let joined="";
     for(let i=from;i<e.results.length;i++){joined+=e.results[i][0].transcript;for(let j=0;j<e.results[i].length;j++)cands.push(e.results[i][j].transcript)}
     if(!cands.length)return;
+    /* 読み上げ中に聞こえた途中の文字が先頭に残っていたら取り除く */
+    if(G.prefix&&joined.startsWith(G.prefix))joined=joined.slice(G.prefix.length);
     cands.push(joined);
     $("heardText").textContent="「"+joined+"」";
     const g=Math.max(...cands.map(c=>grade(c,q()[1])));
@@ -749,12 +753,12 @@ function ensureRec(){
   r.onend=()=>{if(r===rec&&recActive&&voiceOn()&&G){try{r.start()}catch(e){}}};
   try{r.start()}catch(e){}
 }
-/* この問題の聞き取りを始める（認識そのものは動かしたまま） */
+/* この問題の聞き取りを始める。マイクと認識は常に動かしたままで、ここから先の結果だけを判定に使う */
 function listen(){
   const h=$("heard");h.hidden=!voiceOn();if(!voiceOn())return;
   ensureRec();
   h.classList.remove("off");$("heardText").textContent="聞き取り中…";
-  G.base=recFinal;G.hearing=true;
+  G.base=recFinal;G.prefix=recPending;G.hearing=true;
   bgm.duck(true);
   if(G.lastBeat>=0&&G.lastBeat<8)renderBeats(G.lastBeat);
 }
@@ -766,8 +770,6 @@ function voiceFail(){
 /* この問題の聞き取りだけ終える */
 function endHearing(){if(G)G.hearing=false;bgm.duck(false)}
 /* 音声認識を完全に止める（ゲーム終了・中断・マイク不可のとき） */
-/* 読み上げ中はマイクを止める（読み上げの声を拾わないため） */
-function pauseRec(){recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}}
 function stopListen(){endHearing();recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
