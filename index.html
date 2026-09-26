@@ -66,7 +66,7 @@ input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px soli
 .who .misses{display:inline-flex;gap:4px;vertical-align:middle;margin-left:8px}
 .who .misses i{width:10px;height:10px;border-radius:50%;border:2px solid var(--miss)}
 .who .misses i.on{background:var(--miss)}
-.sign{background:var(--sign);color:var(--signink);border-radius:6px;box-shadow:0 0 0 6px #ffffff10,0 12px 40px #F2B33D30;overflow:hidden;position:relative}
+.sign{container-type:inline-size;background:var(--sign);color:var(--signink);border-radius:6px;box-shadow:0 0 0 6px #ffffff10,0 12px 40px #F2B33D30;overflow:hidden;position:relative}
 .sign .band{height:14px;background:var(--lamp)}
 .sign .name .note{display:block;font-size:.34em;letter-spacing:.05em;opacity:.75;margin-top:4px}
 .sign .name{font-family:var(--display);font-size:clamp(44px,15vw,84px);text-align:center;padding:22px 12px 6px;line-height:1.1;word-break:keep-all;overflow-wrap:anywhere}
@@ -74,6 +74,8 @@ input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px soli
 .sign .rail{display:flex;justify-content:space-between;background:var(--signink);color:var(--sign);font-size:12px;padding:8px 12px;gap:8px}
 .sign .rail span{max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sign.flash-ok{animation:ok .5s}
+.sign.is-hard .name{padding-top:40px}
+.sign .hard{position:absolute;top:16px;left:50%;transform:translateX(-50%) rotate(-2deg);background:var(--miss);color:#fff;font-weight:800;font-size:13px;letter-spacing:.06em;padding:3px 10px;border-radius:999px;box-shadow:0 2px 8px #0004}
 .sign.flash-miss{animation:shake .45s}
 @keyframes ok{0%{box-shadow:0 0 0 6px var(--ok),0 0 60px var(--ok)}100%{box-shadow:0 0 0 6px #ffffff10,0 12px 40px #F2B33D30}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
@@ -196,6 +198,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
     <div class="who" id="who"></div>
     <div class="sign" id="sign">
       <div class="band"></div>
+      <div class="hard" id="hard" hidden>難しいよ！</div>
       <div class="name" id="abbr"></div>
       <div class="kana" id="line"></div>
       <div class="rail"><span id="prev">← 始発</span><span>→ ？？？</span></div>
@@ -725,9 +728,11 @@ function abNote(ab){const m=ab.match(/[（(]([^（）()]*)[）)]\s*$/);return m?
 function abForms(ab){return [abRead(ab),abNote(ab),...String(ORIG[ab]||"").split("|")].filter(Boolean)}
 function showAbbr(ab){
   const el=$("abbr"),r=abRead(ab),n=abNote(ab);
+  const hard=isHard(ab);$("hard").hidden=!hard;$("sign").classList.toggle("is-hard",hard);
   el.innerHTML=esc(r)+(n?`<small class="note">（${esc(n)}）</small>`:"");
   /* 長い略語は1行に収まるよう小さくする */
-  el.style.fontSize=r.length>6?`clamp(28px,${Math.floor(90/r.length)}vw,84px)`:"";
+  /* 札の幅（cqw）に対して文字数で割り、1行に収める */
+  el.style.fontSize=r.length>5?`min(84px,${(88/r.length).toFixed(1)}cqw)`:"";
 }
 const ORIG={"リョ":"りょ","アザス":"あざす","オツ":"おつ","シャメ":"写メ","チャクメロ":"着メロ","リアジュウ":"リア充","ウラアカ":"裏垢","ブロカイ":"ブロ解","シュウカツ":"終活","コンカツ":"婚活","ブカツ":"部活","ソツアル":"卒アル","ソツロン":"卒論","ガクワリ":"学割","ニュウシ":"入試","モシ":"模試","カクテイ":"各停","トッキュウ":"特急","テイキ":"定期","ショウエネ":"省エネ","チデジ":"地デジ","アケオメ":"あけおめ","コトヨロ":"ことよろ","ユウキュウ":"有給","サンキュウ":"産休","イクキュウ":"育休","デパチカ":"デパ地下","ヒャッキン":"百均","ムジルシ":"無印","テンドン":"天丼","カツドン":"カツ丼","ナマチュウ":"生中","ハンチャン":"半チャン","アツモリ":"あつ森","モモテツ":"桃鉄","キメツ":"鬼滅","シンゲキ":"進撃","コチカメ":"こち亀","アサドラ":"朝ドラ","コウハク":"紅白","ガキツカ":"ガキ使","グルナイ":"ぐるナイ","メチャイケ":"めちゃイケ","イイトモ":"いいとも","コクレン":"国連","ニチギン":"日銀","トウダイ":"東大","キョウダイ":"京大","タンダイ":"短大","コウセン":"高専","セイキョウ":"生協","ノウキョウ":"農協","ニッテレ":"日テレ","トウショウ":"東証","ニッケイ":"日経","ケイダンレン":"経団連","コウトリ":"公取","ロウキ":"労基","コウロウショウ":"厚労省","モンカショウ":"文科省","コッコウショウ":"国交省","ケイサンショウ":"経産省","ケイキュウ":"京急","キンテツ":"近鉄","ニシテツ":"西鉄","メイテツ":"名鉄","シテツ":"私鉄","チカテツ":"地下鉄","キョウカショ":"教科書","デンタク":"電卓","グンテ":"軍手","ビーダマ":"ビー玉","キッテ":"切手","ショクパン":"食パン","サボル":"サボる","カンケン":"漢検","ゴウコン":"合コン","ディスル":"ディスる","トリマ":"とりま","チナ":"ちな","サブアカ":"サブ垢","カギアカ":"鍵垢","リムル":"リムる","オシメン":"推しメン","ドウタンキョヒ":"同担拒否","カエルカ":"蛙化","パネェ":"ぱねぇ","ガチコイ":"ガチ恋","ウマカク":"うま確"};
 const TTS=window.speechSynthesis;
@@ -796,7 +801,28 @@ function customQs(){
   return cfg.custom.split(/\n/).map(l=>l.split(/[=＝]/)).filter(p=>p.length>=2&&p[0].trim()&&p[1].trim()).map(p=>[p[0].trim(),p.slice(1).join("=").trim(),"c"]);
 }
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-function buildDeck(){return shuffle([...Q,...customQs()].filter(q=>cfg.cats.includes(q[2])))}
+/* 語尾・語頭のゴロが同じ略語（〜コン、〜キュウ、〜テツ など）は、2〜4問ずつ固めて続けて出す。
+   前から順に当てはめ、最初に当たった1つのグループに入れる */
+const GORO={end:["キュウ","チュウ","ショウ","コン","テツ","ハラ","ッパ","ダイ","ケン","イチ","カツ","アカ","トレ","デン","フレ","プリ","メン","セン","サー","タマ","レン","ヘン","クリ","パー","キン","ャン"],
+  head:["モト","マツ","ファミ","ミス","サブ"]};
+function goroOf(ab){
+  const r=abRead(ab);if(r.length<3)return "";
+  const e=GORO.end.find(x=>r.length>x.length&&r.endsWith(x));if(e)return "〜"+e;
+  const h=GORO.head.find(x=>r.length>x.length&&r.startsWith(x));return h?h+"〜":"";
+}
+function arrangeDeck(items){
+  const groups={},units=[];
+  shuffle(items).forEach(it=>{const g=goroOf(it[0]);if(g)(groups[g]=groups[g]||[]).push(it);else units.push([it])});
+  Object.values(groups).forEach(list=>{
+    /* 1問だけのグループはそのまま。2問以上は2〜4問ずつの塊に分ける（1問だけ余ったら単独で出す） */
+    for(let i=0;i<list.length;){
+      const n=Math.min(list.length-i,2+Math.floor(Math.random()*3));
+      units.push(list.slice(i,i+n));i+=n;
+    }
+  });
+  return shuffle(units).flat();
+}
+function buildDeck(){return arrangeDeck([...Q,...customQs()].filter(q=>cfg.cats.includes(q[2])))}
 
 function start(){
   const names=cfg.players.map((n,i)=>n.trim()||("乗客"+(i+1)));
@@ -823,16 +849,21 @@ function depart(){
   const g=G;
   playJingle().then(()=>{if(G===g&&g.departing){g.departing=false;nextQ()}});
 }
+/* 問題ごとの出題数と間違えた回数を、この端末に貯める（{略語:{n:出題数,m:間違い}}） */
+const HARD_MISS=3;
+let stats=store.get("ryakugo-stats",{});
+function tally(ab,miss){const t=stats[ab]||(stats[ab]={n:0,m:0});t.n++;if(miss)t.m++;store.set("ryakugo-stats",stats)}
+function isHard(ab){return ((stats[ab]||{}).m||0)>=HARD_MISS}
 function show(id){["setup","play","result"].forEach(s=>$(s).hidden=s!==id);window.scrollTo(0,0)}
 function cur(){return G.players[G.turn]}
 function q(){return G.deck[G.di%G.deck.length]}
 function nextQ(){
   G.lock=false;G.answered=false;G.station++;
-  if(G.di>0&&G.di%G.deck.length===0)shuffle(G.deck);
+  if(G.di>0&&G.di%G.deck.length===0)G.deck=arrangeDeck(G.deck);
   const p=cur(),item=q();
   $("stNo").textContent=G.station;$("streak").textContent=G.streak;
   $("who").innerHTML=`${esc(p.name)} さん<span class="misses">${Array.from({length:cfg.lives},(_,i)=>`<i class="${i<p.miss?"on":""}"></i>`).join("")}</span>`;
-  $("abbr").textContent="・・・";$("line").textContent=CATS[item[2]]+"線";
+  $("hard").hidden=true;$("sign").classList.remove("is-hard");$("abbr").textContent="・・・";$("line").textContent=CATS[item[2]]+"線";
   $("prev").textContent="← "+G.prev;
   $("peek").classList.remove("on");$("peek").textContent="判定役：ここを押している間だけ正解が見えます";
   const s=$("sign");s.classList.remove("flash-ok","flash-miss");
@@ -884,6 +915,7 @@ function renderBeats(beat){
 function judge(ok,timeout,close,answered){
   if(!G||G.lock)return;G.lock=true;clearInterval(tId);clearTimeout(G.closeT);endHearing();stopTTS();recRefresh();
   const p=cur(),item=q();const s=$("sign");
+  tally(item[0],!ok);
   if(ok){
     const kind=close?"ok3":"ok1";
     p.ok++;G.streak++;G.best=Math.max(G.best,G.streak);sfx.ok(kind);buzz(30);
