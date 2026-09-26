@@ -151,7 +151,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <h2>ルール</h2>
       <div class="row"><label for="bpm">テンポ（BPM）</label>
         <div class="bpmrow"><input type="range" id="bpm" min="80" max="200" step="1"><b id="bpmVal"></b><button class="chip" id="tapBtn" type="button">タップで測る</button></div></div>
-      <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げ、5〜8拍目が回答時間です。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
+      <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げます。回答は読み上げの途中からでも、いつでもできます。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
       <div class="row"><label>何回ミスで終点？</label><div class="chips" id="lives"></div></div>
       <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
       <p class="hint" id="judgeHint"></p>
@@ -189,7 +189,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
     </div>
     <div class="beats" id="beats">
       <div class="dots" id="dots"><i class="read"></i><i class="read"></i><i class="read"></i><i class="read"></i><i class="ans"></i><i class="ans"></i><i class="last"></i><i class="last"></i></div>
-      <div class="phase"><span>読み上げ</span><span>回答</span><span>締切</span></div>
+      <div class="phase"><span>読み上げ（回答OK）</span><span>回答</span><span>締切</span></div>
       <div class="label" id="beatLabel"></div>
     </div>
     <div class="heard" id="heard" hidden><span class="dot"></span><span id="heardText">聞き取り中…</span></div>
@@ -627,7 +627,8 @@ function startRhythm(){
     if(G!==g||g.lock||g.station!==st){clearInterval(tId);return}
     const b=60/cfg.bpm,pos=(clock()-g.cs)/b;
     /* 1拍目ちょうどに声が出るよう、音声合成の立ち上がり分だけ早めに読み上げを始める */
-    if(!g.asked&&pos>=-TTS_LEAD/b&&pos<4){g.asked=true;$("abbr").textContent=q()[0];ask(q()[0],()=>startListening(g,st))}
+    /* 略語の表示・読み上げと同時に聞き取りを始める（読み上げ中でも答えてよい） */
+    if(!g.asked&&pos>=-TTS_LEAD/b&&pos<8){g.asked=true;$("abbr").textContent=q()[0];startListening(g,st);ask(q()[0],()=>{})}
     const beat=Math.floor(pos);
     if(beat!==g.lastBeat){g.lastBeat=beat;onBeat(beat,g,st)}
   },10);
@@ -636,8 +637,6 @@ function startListening(g,st){if(G===g&&!g.lock&&g.station===st&&!g.listening){g
 function onBeat(beat,g,st){
   if(beat<0){renderBeats(-1);return}
   if(cfg.sound==="off")synth.tick();
-  /* マイクは読み終わりか4拍目のどちらか早い方で開く */
-  if(beat===3)startListening(g,st);
   /* 8拍目が終わったら時間切れ（延長なし） */
   if(beat>=8){judge(false,true,false,g.answered);return}
   renderBeats(beat);
@@ -646,7 +645,7 @@ function renderBeats(beat){
   const dots=[...$("dots").children],box=$("beats"),lab=$("beatLabel");
   dots.forEach((d,i)=>d.classList.toggle("now",i===beat));
   box.classList.toggle("late",beat>=8);
-  lab.textContent=beat<0?"次の8拍から":beat<4?"よく聞いて…":beat<6?"答えて！":"急いで！";
+  lab.textContent=beat<0?"次の8拍から":beat<4?"いつでも答えてOK！":beat<6?"答えて！":"急いで！";
 }
 function judge(ok,timeout,close,answered){
   if(!G||G.lock)return;G.lock=true;clearInterval(tId);endHearing();stopTTS();
