@@ -588,6 +588,16 @@ function startMeter(){
       /* 声の大きさを0〜100%に。-60dB〜-10dB を目安に割り当てる */
       const db=20*Math.log10(rms+1e-8),lv=Math.max(0,Math.min(1,(db+60)/50));
       peak=Math.max(lv,peak*0.92);
+      /* 見張り：受付中に声が0.7秒以上入っているのに、認識が何も反応しなければ作り直す */
+      if(G&&G.hearing&&!G.wd){
+        const now=clock();
+        if(lv>0.45){if(!voiceSince)voiceSince=now}else if(lv<0.25)voiceSince=0;
+        if(voiceSince&&now-voiceSince>0.7&&lastSpeechEvt<voiceSince){
+          G.wd=true;voiceSince=0;wdCount++;
+          recRefresh(`認識が反応しないため再起動（${wdCount}回目）`);
+          setTimeout(()=>{if(G&&G.hearing){G.base=0;G.prefix=""}},80);
+        }
+      }else voiceSince=0;
       bar.style.width=(peak*100).toFixed(0)+"%";box.classList.toggle("hot",peak>0.85);
       meterRaf=requestAnimationFrame(loop);
     };
@@ -648,7 +658,7 @@ function nextQ(){
   /* 4拍子2小節（8拍）単位で区切り、次の区切りから1問を始める */
   /* ジングル直後の1問目は、BGMの1拍目からすぐ始める */
   G.cs=G.fresh?G.t0:(G.nextCs!=null?G.nextCs:nextCycle(0.03));G.nextCs=null;G.fresh=false;
-  G.lastBeat=-99;G.late=false;G.listening=false;G.asked=false;
+  G.lastBeat=-99;G.late=false;G.listening=false;G.asked=false;G.wd=false;
   if(voiceOn()){$("heard").hidden=false;$("heard").classList.remove("off");$("heardText").textContent="次の問題を待っています";$("micRow").hidden=false;$("micBar").hidden=!cfg.meter;accStat()}
   $("beats").hidden=false;$("beats").classList.remove("late");
   renderBeats(-1);
@@ -688,7 +698,7 @@ function renderBeats(beat){
   lab.textContent=beat<0?"次の8拍から":beat<6?(G&&G.hearing?"答えて！":"よく聞いて…"):"急いで！";
 }
 function judge(ok,timeout,close,answered){
-  if(!G||G.lock)return;G.lock=true;clearInterval(tId);endHearing();stopTTS();
+  if(!G||G.lock)return;G.lock=true;clearInterval(tId);endHearing();stopTTS();recRefresh();
   const p=cur(),item=q();const s=$("sign");
   if(ok){
     const kind=close?"ok3":"ok1";
@@ -756,7 +766,7 @@ function grade(said,ans){
 }
 function matches(said,ans){return grade(said,ans)>0}
 const FILLERS=["えー","えーと","えっと","あー","あの","あのー","うーん","んー","えっ","ええと","なんだっけ"].map(x=>x);
-let rec=null,recActive=false,recFinal=0,recPending="",recRestarts=0;
+let rec=null,recActive=false,recFinal=0,recPending="",recRestarts=0,lastSpeechEvt=0,wdCount=0,voiceSince=0;
 /* 診断表示：認識の状態と、いま判定を受け付けているか */
 function recStat(t,err){const el=$("recState");if(!el)return;el.textContent=t;el.classList.toggle("err",!!err)}
 function accStat(){const el=$("accState");if(!el)return;const on=!!(G&&G.hearing);el.textContent=on?"受付中":(G&&G.asked&&!G.lock?"読み上げ中（無視）":"待機");el.classList.toggle("on",on)}
@@ -769,9 +779,10 @@ function ensureRec(){
   const r=rec;
   r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中")};
   r.onaudiostart=()=>recStat("認識：マイク受信中");
-  r.onspeechstart=()=>recStat("認識：声を検出");
+  r.onspeechstart=()=>{lastSpeechEvt=clock();recStat("認識：声を検出")};
   r.onspeechend=()=>recStat("認識：マイク受信中");
   r.onresult=e=>{
+    lastSpeechEvt=clock();
     if(r!==rec)return;
     /* 確定した結果の数を数えておく（次の問題はここから先だけを見る） */
     let f=0;while(f<e.results.length&&e.results[f].isFinal)f++;recFinal=f;
@@ -814,6 +825,13 @@ function voiceFail(){
   voiceBroken=true;stopListen();
   const h=$("heard");h.hidden=false;h.classList.add("off");
   $("heardText").textContent="マイクが使えないため、手動判定に切り替えました";
+}
+/* 認識をいったん作り直す。判定の直後に行うので、立ち上がりの時間は次の問題までの間に収まる */
+function recRefresh(why){
+  if(!voiceOn())return;
+  recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}
+  if(why)recStat(why,true);
+  setTimeout(()=>{if(G&&voiceOn())ensureRec()},60);
 }
 /* この問題の聞き取りだけ終える */
 function endHearing(){if(G)G.hearing=false;bgm.duck(false);accStat()}
