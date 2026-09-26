@@ -151,7 +151,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <h2>ルール</h2>
       <div class="row"><label for="bpm">テンポ（BPM）</label>
         <div class="bpmrow"><input type="range" id="bpm" min="80" max="200" step="1"><b id="bpmVal"></b><button class="chip" id="tapBtn" type="button">タップで測る</button></div></div>
-      <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げます。回答は読み上げの途中からでも、いつでもできます。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
+      <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げます。読み上げ中はマイクを止め、読み終わった瞬間から回答できます。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
       <div class="row"><label>何回ミスで終点？</label><div class="chips" id="lives"></div></div>
       <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
       <p class="hint" id="judgeHint"></p>
@@ -189,7 +189,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
     </div>
     <div class="beats" id="beats">
       <div class="dots" id="dots"><i class="read"></i><i class="read"></i><i class="read"></i><i class="read"></i><i class="ans"></i><i class="ans"></i><i class="last"></i><i class="last"></i></div>
-      <div class="phase"><span>読み上げ（回答OK）</span><span>回答</span><span>締切</span></div>
+      <div class="phase"><span>読み上げ</span><span>回答</span><span>締切</span></div>
       <div class="label" id="beatLabel"></div>
     </div>
     <div class="heard" id="heard" hidden><span class="dot"></span><span id="heardText">聞き取り中…</span></div>
@@ -547,8 +547,10 @@ function unlockTTS(){
 /* 略語を読み上げ、終わったら then を呼ぶ。読み上げ非対応やオフのときはすぐ呼ぶ */
 function ask(abbr,then){
   if(!TTS||!cfg.tts){then();return}
+  pauseRec();
   let fired=false;const go=()=>{if(fired)return;fired=true;clearTimeout(guard);then()};
-  const guard=setTimeout(go,4000);
+  /* 読み上げが終わった通知が来ない端末のため、4拍で打ち切る */
+  const guard=setTimeout(go,4*60000/cfg.bpm);
   try{
     TTS.cancel();
     const u=new SpeechSynthesisUtterance(YOMI[abbr]||abbr);
@@ -627,8 +629,8 @@ function startRhythm(){
     if(G!==g||g.lock||g.station!==st){clearInterval(tId);return}
     const b=60/cfg.bpm,pos=(clock()-g.cs)/b;
     /* 1拍目ちょうどに声が出るよう、音声合成の立ち上がり分だけ早めに読み上げを始める */
-    /* 略語の表示・読み上げと同時に聞き取りを始める（読み上げ中でも答えてよい） */
-    if(!g.asked&&pos>=-TTS_LEAD/b&&pos<8){g.asked=true;$("abbr").textContent=q()[0];startListening(g,st);ask(q()[0],()=>{})}
+    /* 1拍目：略語を表示して読み上げる。読み上げ中はマイクを切り、読み終わった瞬間から回答を受け付ける */
+    if(!g.asked&&pos>=-TTS_LEAD/b&&pos<8){g.asked=true;$("abbr").textContent=q()[0];ask(q()[0],()=>startListening(g,st))}
     const beat=Math.floor(pos);
     if(beat!==g.lastBeat){g.lastBeat=beat;onBeat(beat,g,st)}
   },10);
@@ -645,7 +647,7 @@ function renderBeats(beat){
   const dots=[...$("dots").children],box=$("beats"),lab=$("beatLabel");
   dots.forEach((d,i)=>d.classList.toggle("now",i===beat));
   box.classList.toggle("late",beat>=8);
-  lab.textContent=beat<0?"次の8拍から":beat<4?"いつでも答えてOK！":beat<6?"答えて！":"急いで！";
+  lab.textContent=beat<0?"次の8拍から":beat<6?(G&&G.hearing?"答えて！":"よく聞いて…"):"急いで！";
 }
 function judge(ok,timeout,close,answered){
   if(!G||G.lock)return;G.lock=true;clearInterval(tId);endHearing();stopTTS();
@@ -754,6 +756,7 @@ function listen(){
   h.classList.remove("off");$("heardText").textContent="聞き取り中…";
   G.base=recFinal;G.hearing=true;
   bgm.duck(true);
+  if(G.lastBeat>=0&&G.lastBeat<8)renderBeats(G.lastBeat);
 }
 function voiceFail(){
   voiceBroken=true;stopListen();
@@ -763,6 +766,8 @@ function voiceFail(){
 /* この問題の聞き取りだけ終える */
 function endHearing(){if(G)G.hearing=false;bgm.duck(false)}
 /* 音声認識を完全に止める（ゲーム終了・中断・マイク不可のとき） */
+/* 読み上げ中はマイクを止める（読み上げの声を拾わないため） */
+function pauseRec(){recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}}
 function stopListen(){endHearing();recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
