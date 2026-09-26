@@ -662,7 +662,7 @@ function nextQ(){
   /* 4拍子2小節（8拍）単位で区切り、次の区切りから1問を始める */
   /* ジングル直後の1問目は、BGMの1拍目からすぐ始める */
   G.cs=G.fresh?G.t0:(G.nextCs!=null?G.nextCs:nextCycle(0.03));G.nextCs=null;G.fresh=false;
-  G.lastBeat=-99;G.late=false;G.listening=false;G.asked=false;G.wd=false;
+  G.lastBeat=-99;G.late=false;G.listening=false;G.asked=false;G.wd=false;G.closePending=false;clearTimeout(G.closeT);
   if(voiceOn()){$("heard").hidden=false;$("heard").classList.remove("off");$("heardText").textContent="次の問題を待っています";$("micRow").hidden=false;$("micBar").hidden=!cfg.meter;accStat()}
   $("beats").hidden=false;$("beats").classList.remove("late");
   renderBeats(-1);
@@ -692,7 +692,7 @@ function onBeat(beat,g,st){
   if(beat<0){renderBeats(-1);return}
   if(cfg.sound==="off")synth.tick();
   /* 8拍目が終わったら時間切れ（延長なし） */
-  if(beat>=8){judge(false,true,false,g.answered);return}
+  if(beat>=8){clearTimeout(g.closeT);if(g.closePending){judge(true,false,true);return}judge(false,true,false,g.answered);return}
   renderBeats(beat);
 }
 function renderBeats(beat){
@@ -702,7 +702,7 @@ function renderBeats(beat){
   lab.textContent=beat<0?"次の8拍から":beat<6?(G&&G.hearing?"答えて！":"よく聞いて…"):"急いで！";
 }
 function judge(ok,timeout,close,answered){
-  if(!G||G.lock)return;G.lock=true;clearInterval(tId);endHearing();stopTTS();recRefresh();
+  if(!G||G.lock)return;G.lock=true;clearInterval(tId);clearTimeout(G.closeT);endHearing();stopTTS();recRefresh();
   const p=cur(),item=q();const s=$("sign");
   if(ok){
     const kind=close?"ok3":"ok1";
@@ -859,8 +859,20 @@ function ensureRec(){
     if(G.prefix&&joined.startsWith(G.prefix))joined=joined.slice(G.prefix.length);
     cands.push(joined);
     $("heardText").textContent="「"+joined+"」";
+    /* すべての候補を採点し、一番良い点を使う */
     const g=Math.max(...cands.map(c=>grade(c,q()[1])));
-    if(g>0){judge(true,false,g===1);return}
+    /* 完全正解はその場で確定 */
+    if(g===2){clearTimeout(G.closeT);judge(true,false,false);return}
+    /* 惜しい（ほぼ一致）は、話している途中の暫定の文字かもしれないので即決しない。
+       文が確定したら判定し、確定前なら0.4秒待って完全正解に変わらなければ「惜しい」にする */
+    if(g===1){
+      G.closePending=true;
+      const lastRes=e.results[e.results.length-1];
+      clearTimeout(G.closeT);
+      if(lastRes.isFinal){judge(true,false,true);return}
+      const gg=G;G.closeT=setTimeout(()=>{if(G===gg&&!gg.lock&&gg.closePending)judge(true,false,true)},400);
+      return;
+    }
     /* 何か答えたかを記録する。読み上げの略語・つなぎ言葉だけなら数えない */
     const abbr=norm(q()[0]);let t=norm(joined);if(abbr)t=t.split(abbr).join("");
     const skip=t.length<2||FILLERS.some(x=>norm(x)===t);
