@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1030">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+<title>略語夜行</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --sky:#0B1030; --sky2:#172055; --ink:#E9ECFF; --muted:#8F98C9;
+  --line:#2A336B; --panel:#141B45;
+  --sign:#F4F6FB; --signink:#10163A; --lamp:#F2B33D;
+  --ok:#3DDC97; --miss:#FF5B5B;
+  --display:"Dela Gothic One","Hiragino Sans","Noto Sans JP",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+}
+html,body{height:100%}
+body{
+  margin:0;font-family:var(--body);color:var(--ink);
+  background:
+    radial-gradient(1px 1px at 12% 18%,#fff9 50%,transparent 51%),
+    radial-gradient(1px 1px at 78% 9%,#fff8 50%,transparent 51%),
+    radial-gradient(1.5px 1.5px at 60% 30%,#fffa 50%,transparent 51%),
+    radial-gradient(1px 1px at 30% 62%,#fff6 50%,transparent 51%),
+    radial-gradient(1px 1px at 88% 55%,#fff7 50%,transparent 51%),
+    radial-gradient(1.5px 1.5px at 8% 85%,#fff8 50%,transparent 51%),
+    radial-gradient(1px 1px at 48% 92%,#fff6 50%,transparent 51%),
+    linear-gradient(180deg,var(--sky) 0%,var(--sky2) 100%);
+  background-attachment:fixed;
+  -webkit-tap-highlight-color:transparent;
+}
+.app{max-width:520px;margin:0 auto;min-height:100%;padding-inline:16px;padding-block:16px 24px;box-sizing:border-box;display:flex;flex-direction:column}
+section{display:flex;flex-direction:column;gap:16px;flex:1}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,10vw,48px);line-height:1.1;margin:8px 0 0;letter-spacing:.02em;text-wrap:balance}
+h1 small{display:block;font-family:var(--body);font-size:14px;font-weight:700;color:var(--lamp);letter-spacing:.2em;margin-bottom:6px}
+.lead{margin:0;color:var(--muted);line-height:1.7;font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.card h2{margin:0;font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:700}
+.players{display:flex;flex-direction:column;gap:8px}
+.prow{display:flex;gap:8px;align-items:center}
+.prow .no{width:28px;font-family:var(--display);color:var(--lamp);text-align:center;font-variant-numeric:tabular-nums}
+input[type=text],textarea{flex:1;min-width:0;background:var(--sky);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px}
+textarea{min-height:88px;resize:vertical;width:100%;box-sizing:border-box}
+input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+.x{background:none;border:1px solid var(--line);color:var(--muted);width:40px;height:40px;border-radius:10px;font-size:18px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--lamp);border-color:var(--lamp);color:var(--signink);font-weight:700}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.row label{font-size:14px}
+.btn{font:inherit;font-weight:900;font-size:18px;border:0;border-radius:14px;padding:16px;cursor:pointer;color:var(--signink);background:var(--lamp);letter-spacing:.06em}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:700;font-size:15px;padding:12px}
+.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.6}
+
+/* play */
+#play{gap:14px}
+.top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.top b{color:var(--lamp);font-family:var(--display);font-weight:400;font-size:18px}
+.next{text-align:center;font-weight:700;letter-spacing:.2em;color:var(--muted);font-size:13px}
+.who{text-align:center;font-family:var(--display);font-size:clamp(26px,8vw,36px);margin-top:-8px}
+.who .misses{display:inline-flex;gap:4px;vertical-align:middle;margin-left:8px}
+.who .misses i{width:10px;height:10px;border-radius:50%;border:2px solid var(--miss)}
+.who .misses i.on{background:var(--miss)}
+.sign{background:var(--sign);color:var(--signink);border-radius:6px;box-shadow:0 0 0 6px #ffffff10,0 12px 40px #F2B33D30;overflow:hidden;position:relative}
+.sign .band{height:14px;background:var(--lamp)}
+.sign .name{font-family:var(--display);font-size:clamp(44px,15vw,84px);text-align:center;padding:22px 12px 6px;line-height:1.1;word-break:keep-all;overflow-wrap:anywhere}
+.sign .kana{text-align:center;font-size:13px;letter-spacing:.3em;color:#5A6190;padding-bottom:14px;min-height:1em}
+.sign .rail{display:flex;justify-content:space-between;background:var(--signink);color:var(--sign);font-size:12px;padding:8px 12px;gap:8px}
+.sign .rail span{max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sign.flash-ok{animation:ok .5s}
+.sign.flash-miss{animation:shake .45s}
+@keyframes ok{0%{box-shadow:0 0 0 6px var(--ok),0 0 60px var(--ok)}100%{box-shadow:0 0 0 6px #ffffff10,0 12px 40px #F2B33D30}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
+.timer{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.timer i{display:block;height:100%;background:var(--lamp);width:100%;transform-origin:left}
+.timer.low i{background:var(--miss)}
+.filebox{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.filebox .btn{cursor:pointer;text-align:center}
+input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
+.heard{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;min-height:24px}
+.heard .dot{width:10px;height:10px;border-radius:50%;background:var(--miss);flex:none;animation:rec 1s infinite}
+.heard.off .dot{background:var(--muted);animation:none}
+@keyframes rec{50%{opacity:.25}}
+.peek{font:inherit;font-size:14px;background:transparent;color:var(--muted);border:1px dashed var(--line);border-radius:12px;padding:14px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;min-height:52px}
+.peek.on{color:var(--ink);border-color:var(--lamp);font-weight:700;font-size:18px}
+.judge{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:auto}
+.judge button{font-family:var(--display);font-size:28px;border:0;border-radius:16px;padding:22px 8px;cursor:pointer;color:#0B1030}
+.judge .ok{background:var(--ok)}
+.judge .ng{background:var(--miss)}
+.judge small{display:block;font-family:var(--body);font-size:12px;font-weight:700;margin-top:4px}
+
+/* overlay */
+.overlay{position:fixed;inset:0;background:#0B1030E6;display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+.sheet{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.sheet .big{font-family:var(--display);font-size:32px;line-height:1.2}
+.sheet .ans{font-size:22px;font-weight:900;color:var(--lamp)}
+.sheet .sub{color:var(--muted);font-size:14px;margin:0;line-height:1.6}
+.bad{color:var(--miss)}
+
+/* result */
+.batsu{background:var(--miss);color:#1a0508;border-radius:14px;padding:18px;text-align:center}
+.batsu p{margin:0;font-size:13px;font-weight:700;letter-spacing:.14em}
+.batsu .who2{font-family:var(--display);font-size:30px;margin:6px 0}
+.batsu .task{font-size:20px;font-weight:900;line-height:1.5}
+.stats{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+.stats th,.stats td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:right}
+.stats th:first-child,.stats td:first-child{text-align:left}
+.stats th{color:var(--muted);font-weight:700;font-size:12px}
+.missed{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none;font-size:14px}
+.missed li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted var(--line);padding-bottom:6px}
+.missed b{font-family:var(--display);font-weight:400}
+.btns{display:flex;flex-direction:column;gap:10px}
+@media (prefers-reduced-motion:reduce){.sign.flash-ok,.sign.flash-miss,.heard .dot{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SETUP -->
+  <section id="setup">
+    <h1><small>みんなで遊ぶ略語ゲーム</small>略語夜行</h1>
+    <p class="lead">画面の駅名に出る略語を、正式名称に戻して声で答えます。スマホ1台を真ん中に置くか、順番に回して遊んでください。同じ人が決められた回数ミスしたら終点で、その人に罰ゲームです。</p>
+
+    <div class="card">
+      <h2>乗客（2〜8人）</h2>
+      <div class="players" id="players"></div>
+      <button class="btn ghost" id="addP" type="button">＋ 乗客を追加</button>
+    </div>
+
+    <div class="card">
+      <h2>路線（出題ジャンル）</h2>
+      <div class="chips" id="cats"></div>
+    </div>
+
+    <div class="card">
+      <h2>ルール</h2>
+      <div class="row"><label>制限時間</label><div class="chips" id="times"></div></div>
+      <div class="row"><label>何回ミスで終点？</label><div class="chips" id="lives"></div></div>
+      <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
+      <p class="hint" id="judgeHint"></p>
+    </div>
+
+    <div class="card">
+      <h2>BGM</h2>
+      <div class="chips" id="bgmMode"></div>
+      <div id="fileBox" class="filebox" hidden>
+        <label class="btn ghost" for="bgmFile">音声ファイルを選ぶ</label>
+        <input type="file" id="bgmFile" accept="audio/*" hidden>
+        <span class="hint" id="fileName">まだ選ばれていません</span>
+      </div>
+      <div class="row"><label for="vol">音量</label><input type="range" id="vol" min="0" max="100" step="5"></div>
+      <p class="hint" id="bgmHint"></p>
+    </div>
+
+    <div class="card">
+      <h2>オリジナル問題（任意）</h2>
+      <textarea id="custom" placeholder="1行に1問、「略語=正式名称」の形で書きます。&#10;例）ヤマケン=山田健一&#10;例）朝会=朝のミーティング"></textarea>
+      <p class="hint">身内ネタや社内用語を入れると盛り上がります。ここに書いた問題はオリジナル路線として出題されます。音声判定で別の言い方も正解にしたいときは「|」で区切ります（例：朝会=朝のミーティング|朝礼）。</p>
+    </div>
+
+    <button class="btn" id="startBtn" type="button">出発進行！</button>
+    <p class="hint" id="setupMsg" aria-live="polite"></p>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" hidden>
+    <div class="top"><span>第 <b id="stNo">1</b> 駅</span><span>連続正解 <b id="streak">0</b></span><button class="x" id="quit" type="button" aria-label="やめる">✕</button></div>
+    <div class="next">つぎは</div>
+    <div class="who" id="who"></div>
+    <div class="sign" id="sign">
+      <div class="band"></div>
+      <div class="name" id="abbr"></div>
+      <div class="kana" id="line"></div>
+      <div class="rail"><span id="prev">← 始発</span><span>→ ？？？</span></div>
+    </div>
+    <div class="timer" id="timer"><i id="bar"></i></div>
+    <div class="heard" id="heard" hidden><span class="dot"></span><span id="heardText">聞き取り中…</span></div>
+    <button class="peek" id="peek" type="button">判定役：ここを押している間だけ正解が見えます</button>
+    <div class="judge">
+      <button class="ok" id="okBtn" type="button">○<small>正解</small></button>
+      <button class="ng" id="ngBtn" type="button">×<small>ミス</small></button>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" hidden>
+    <h1><small>終点です</small>罰ゲーム</h1>
+    <div class="batsu">
+      <p>ご乗車ありがとうございました</p>
+      <div class="who2" id="loser"></div>
+      <div class="task" id="task"></div>
+    </div>
+    <button class="btn ghost" id="reroll" type="button">罰ゲームを引き直す</button>
+    <div class="card">
+      <h2>今回の記録</h2>
+      <div class="row"><span>停車駅（出題数）</span><b id="rTotal"></b></div>
+      <div class="row"><span>最長連続正解</span><b id="rBest"></b></div>
+      <table class="stats"><thead><tr><th>乗客</th><th>正解</th><th>ミス</th></tr></thead><tbody id="rTable"></tbody></table>
+    </div>
+    <div class="card" id="missCard">
+      <h2>つまずいた駅</h2>
+      <ul class="missed" id="rMissed"></ul>
+    </div>
+    <div class="btns">
+      <button class="btn" id="again" type="button">同じメンバーでもう一度</button>
+      <button class="btn ghost" id="toSetup" type="button">設定に戻る</button>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="ov" hidden>
+  <div class="sheet">
+    <div class="big" id="ovTitle"></div>
+    <div class="ans" id="ovAns"></div>
+    <p class="sub" id="ovSub"></p>
+    <button class="btn" id="ovBtn" type="button">仕切り直して発車</button>
+  </div>
+</div>
+
+<script>
+const CATS={
+  d:"日常・仕事",f:"食べ物・お店",e:"エンタメ",o:"組織・乗り物",n:"ネット・若者言葉",c:"オリジナル"
+};
+const Q=[
+["スマホ","スマートフォン","n"],["アプリ","アプリケーション","n"],["インスタ","インスタグラム","n"],["サブスク","サブスクリプション","n"],
+["コスパ","コストパフォーマンス","n"],["タイパ","タイムパフォーマンス","n"],["ワンチャン","ワンチャンス","n"],["パリピ","パーティーピープル","n"],
+["ソシャゲ","ソーシャルゲーム","n"],["ネトゲ","ネットゲーム","n"],["りょ","了解|りょうかい","n"],["あざす","ありがとうございます","n"],
+["おつ","お疲れさま|お疲れ様|おつかれさま","n"],["写メ","写真付きメール|写真メール","n"],["メアド","メールアドレス","n"],["着メロ","着信メロディ","n"],
+["KY","空気が読めない|空気読めない","n"],["リア充","リアルが充実している人|リアルが充実","n"],["裏垢","裏アカウント","n"],["DM","ダイレクトメッセージ","n"],
+["ラスボス","ラストボス","n"],["テンアゲ","テンションアゲアゲ","n"],["チョベリバ","超ベリーバッド","n"],["MK5","マジでキレる5秒前|マジで切れる5秒前|マジでキレる五秒前","n"],
+["KP","乾杯|かんぱい","n"],["ブロ解","ブロック解除","n"],["ギャラ","ギャランティ","n"],
+["パソコン","パーソナルコンピューター","d"],["エアコン","エアコンディショナー","d"],["リモコン","リモートコントローラー","d"],["デジカメ","デジタルカメラ","d"],
+["ワープロ","ワードプロセッサー","d"],["シャーペン","シャープペンシル","d"],["ハンカチ","ハンカチーフ","d"],["ラジカセ","ラジオカセットレコーダー","d"],
+["パトカー","パトロールカー","d"],["ガソスタ","ガソリンスタンド","d"],["ゲーセン","ゲームセンター","d"],["カラオケ","空（から）オーケストラ|からオーケストラ","d"],
+["プリクラ","プリント倶楽部","d"],["バイト","アルバイト","d"],["就活","就職活動","d"],["婚活","結婚活動","d"],["終活","人生の終わりのための活動","d"],
+["部活","部活動","d"],["卒アル","卒業アルバム","d"],["卒論","卒業論文","d"],["学割","学生割引","d"],["入試","入学試験","d"],["模試","模擬試験","d"],
+["各停","各駅停車","d"],["特急","特別急行","d"],["定期","定期券","d"],["省エネ","省エネルギー","d"],["地デジ","地上デジタル放送","d"],
+["ドタキャン","土壇場キャンセル","d"],["あけおめ","あけましておめでとう|明けましておめでとう","d"],["ことよろ","今年もよろしく|ことしもよろしく","d"],["リストラ","リストラクチャリング","d"],
+["アポ","アポイントメント","d"],["インフラ","インフラストラクチャー","d"],["セクハラ","セクシャルハラスメント","d"],["パワハラ","パワーハラスメント","d"],
+["ロケハン","ロケーションハンティング","d"],["ワンオペ","ワンオペレーション","d"],["有給","有給休暇|年次有給休暇","d"],["産休","産前産後休業","d"],["育休","育児休業","d"],
+["エレキ","エレキギター","d"],["アメフト","アメリカンフットボール","d"],["アニメ","アニメーション","d"],["テレビ","テレビジョン","d"],
+["コンビニ","コンビニエンスストア","f"],["ファミレス","ファミリーレストラン","f"],["デパ地下","デパートの地下食品売り場","f"],["百均","百円均一","f"],
+["マック","マクドナルド","f"],["スタバ","スターバックスコーヒー|スターバックス","f"],["ミスド","ミスタードーナツ","f"],["ケンタ","ケンタッキーフライドチキン|ケンタッキー","f"],
+["サイゼ","サイゼリヤ","f"],["ロイホ","ロイヤルホスト","f"],["ドンキ","ドン・キホーテ","f"],["ファミマ","ファミリーマート","f"],
+["セブイレ","セブン-イレブン","f"],["コメダ","コメダ珈琲店","f"],["無印","無印良品","f"],["ユニクロ","ユニーク・クロージング・ウエアハウス","f"],
+["ポテチ","ポテトチップス","f"],["マヨ","マヨネーズ","f"],["アイス","アイスクリーム","f"],["オムライス","オムレツライス","f"],
+["天丼","天ぷら丼","f"],["カツ丼","カツレツ丼","f"],["生中","生ビール中ジョッキ","f"],["チューハイ","焼酎ハイボール","f"],
+["レモサワ","レモンサワー","f"],["半チャン","半チャーハン","f"],
+["ポケモン","ポケットモンスター","e"],["ドラクエ","ドラゴンクエスト","e"],["FF","ファイナルファンタジー","e"],["マリカー","マリオカート","e"],
+["スマブラ","大乱闘スマッシュブラザーズ","e"],["モンハン","モンスターハンター","e"],["あつ森","あつまれ どうぶつの森","e"],["桃鉄","桃太郎電鉄","e"],
+["ファミコン","ファミリーコンピュータ","e"],["エヴァ","新世紀エヴァンゲリオン","e"],["ハリポタ","ハリー・ポッター","e"],["鬼滅","鬼滅の刃","e"],
+["進撃","進撃の巨人","e"],["スラダン","スラムダンク","e"],["ジョジョ","ジョジョの奇妙な冒険","e"],["こち亀","こちら葛飾区亀有公園前派出所","e"],
+["キムタク","木村拓哉","e"],["ミスチル","ミスター・チルドレン","e"],["ドリカム","ドリームズ・カム・トゥルー","e"],["サザン","サザンオールスターズ","e"],
+["ラルク","ラルク・アン・シエル","e"],["朝ドラ","朝の連続テレビ小説|連続テレビ小説","e"],["月9","月曜夜9時のドラマ|月曜9時のドラマ|月曜日の夜9時のドラマ","e"],["紅白","紅白歌合戦","e"],
+["Mステ","ミュージックステーション","e"],["ガキ使","ダウンタウンのガキの使いやあらへんで|ガキの使いやあらへんで","e"],["ぐるナイ","ぐるぐるナインティナイン","e"],
+["めちゃイケ","めちゃ×2イケてるッ！|めちゃめちゃイケてる","e"],["いいとも","笑っていいとも！","e"],["USJ","ユニバーサル・スタジオ・ジャパン","e"],["TDL","東京ディズニーランド","e"],
+["国連","国際連合","o"],["日銀","日本銀行","o"],["東大","東京大学","o"],["京大","京都大学","o"],["短大","短期大学","o"],["高専","高等専門学校","o"],
+["生協","生活協同組合","o"],["農協","農業協同組合","o"],["NHK","日本放送協会","o"],["日テレ","日本テレビ|日本テレビ放送網","o"],["JAL","日本航空","o"],
+["ANA","全日本空輸","o"],["東証","東京証券取引所","o"],["日経","日本経済新聞","o"],["経団連","日本経済団体連合会","o"],["公取","公正取引委員会","o"],
+["労基","労働基準監督署","o"],["厚労省","厚生労働省","o"],["文科省","文部科学省","o"],["国交省","国土交通省","o"],["経産省","経済産業省","o"],
+["JAXA","宇宙航空研究開発機構","o"],["WHO","世界保健機関","o"],["京急","京浜急行電鉄","o"],["近鉄","近畿日本鉄道","o"],["西鉄","西日本鉄道","o"],
+["名鉄","名古屋鉄道","o"],["私鉄","私営鉄道","o"],["地下鉄","地下鉄道","o"]
+];
+const PENALTY=[
+"一発ギャグを全力で","変顔で記念撮影","好きな芸能人のモノマネ","次のゲームが終わるまで語尾を「〜でございます」に",
+"全員の良いところを1つずつ言う","最近あった恥ずかしい話を1つ","全員分の飲み物を注ぐ係","10秒間、全力の決めポーズ",
+"車掌さんになりきって「次は終点〜」のアナウンス","今日の自分に点数をつけて理由を言う","右隣の人にありがとうを込めて一言","好きな略語を3つ即答"
+];
+
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",bgm:"orig",vol:60},store.get("ryakugo-cfg",{}));
+let voiceBroken=false;
+
+/* ---------- setup UI ---------- */
+function renderPlayers(){
+  const box=$("players");box.innerHTML="";
+  cfg.players.forEach((n,i)=>{
+    const r=document.createElement("div");r.className="prow";
+    r.innerHTML=`<span class="no">${i+1}</span><input type="text" id="p${i}" maxlength="12" aria-label="乗客${i+1}の名前">`;
+    const inp=r.querySelector("input");inp.value=n;inp.oninput=()=>{cfg.players[i]=inp.value;save()};
+    if(cfg.players.length>2){const x=document.createElement("button");x.className="x";x.type="button";x.textContent="−";x.setAttribute("aria-label","削除");x.onclick=()=>{cfg.players.splice(i,1);save();renderPlayers()};r.appendChild(x)}
+    box.appendChild(r);
+  });
+  $("addP").hidden=cfg.players.length>=8;
+}
+function chipGroup(el,items,isOn,onTap){
+  el.innerHTML="";
+  items.forEach(([v,label])=>{const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=label;b.setAttribute("aria-pressed",isOn(v));b.onclick=()=>{onTap(v);save();renderAll()};el.appendChild(b)});
+}
+function renderAll(){
+  renderPlayers();
+  chipGroup($("cats"),Object.entries(CATS),v=>cfg.cats.includes(v),v=>{cfg.cats=cfg.cats.includes(v)?cfg.cats.filter(c=>c!==v):[...cfg.cats,v]});
+  chipGroup($("times"),[[5,"5秒"],[7,"7秒"],[10,"10秒"],[0,"なし"]],v=>cfg.time===v,v=>cfg.time=v);
+  chipGroup($("lives"),[[1,"1回"],[2,"2回"],[3,"3回"]],v=>cfg.lives===v,v=>cfg.lives=v);
+  chipGroup($("judgeMode"),[["voice","音声で自動"],["manual","判定役が手動"]],v=>cfg.judge===v,v=>cfg.judge=v);
+  chipGroup($("bgmMode"),[["orig","オリジナル曲"],["file","自分のファイル"],["off","なし"]],v=>cfg.bgm===v,v=>cfg.bgm=v);
+  $("fileBox").hidden=cfg.bgm!=="file";
+  $("vol").value=cfg.vol;
+  $("bgmHint").textContent=cfg.bgm==="orig"
+    ?"線路のリズムに合わせた、このゲーム用のオリジナル曲です。残り3秒になるとテンポが上がり、ミスすると止まります。"
+    :cfg.bgm==="file"
+      ?"スマホに入っている音声ファイルを選ぶと、プレイ中にくり返し流れます。ファイルはこの端末の中で読み込むだけで、どこにも送られません。ページを開き直したら選び直してください。"
+      :"BGMなしで遊びます。効果音は鳴ります。";
+  if(cfg.judge==="voice")$("bgmHint").textContent+=" 音声判定では、BGMの音をマイクが拾わないよう音量を控えめにしてください。";
+  $("judgeHint").textContent=cfg.judge==="voice"
+    ?(SR?(voiceBroken?"このページではマイクが使えませんでした。手動判定で進みます。https のサイトに置いたページで開くと音声判定が使えます。":"声で正式名称を言うと自動で○になります。時間切れは×です。聞き取りが外れたときは○×ボタンで直せます。最初にマイクの許可を求められます。")
+        :"このブラウザは音声認識に対応していません。Android の Chrome か iPhone の Safari で開いてください。今は手動判定で進みます。")
+    :"判定役が「押している間だけ正解が見える」ボタンで答えを確認し、○×を押します。";
+  $("custom").value=cfg.custom;
+}
+function save(){store.set("ryakugo-cfg",cfg)}
+$("addP").onclick=()=>{cfg.players.push("ともだち"+cfg.players.length);save();renderPlayers()};
+$("custom").oninput=e=>{cfg.custom=e.target.value;save()};
+$("vol").oninput=e=>{cfg.vol=+e.target.value;save();bgm.volume()};
+$("bgmFile").onchange=e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  if(bgmUrl)URL.revokeObjectURL(bgmUrl);
+  bgmUrl=URL.createObjectURL(f);bgmEl.src=bgmUrl;$("fileName").textContent=f.name;
+};
+
+/* ---------- sound ---------- */
+let ac=null;
+function beep(f,d=.12,type="square",vol=.06,when=0){
+  if(!ac)return;const t=ac.currentTime+when;const o=ac.createOscillator(),g=ac.createGain();
+  o.type=type;o.frequency.value=f;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  o.connect(g).connect(ac.destination);o.start(t);o.stop(t+d+.02);
+}
+const sfx={
+  start(){beep(660,.35,"triangle",.08);beep(880,.5,"triangle",.08,.3)},
+  tick(){beep(1200,.05,"square",.04)},
+  ok(){beep(988,.09,"square",.05);beep(1319,.18,"square",.05,.09)},
+  miss(){beep(180,.45,"sawtooth",.08)}
+};
+function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
+
+/* ---------- BGM ---------- */
+const bgmEl=new Audio();bgmEl.loop=true;bgmEl.preload="auto";
+let bgmUrl=null;
+const bgm=(()=>{
+  let master=null,timer=null,step=0,next=0,fast=false,playing=false,noiseBuf=null;
+  const hz=m=>440*Math.pow(2,(m-69)/12);
+  /* オリジナル曲：Aマイナー・ペンタトニック、4小節ループ（MIDIノート番号、null=休符） */
+  const MEL=[
+    69,null,72,null, 74,null,72,69, null,67,69,null, 64,null,null,null,
+    69,null,72,null, 74,76,null,74, 72,null,69,null, 72,null,null,null,
+    76,null,74,null, 72,null,74,76, null,79,76,null, 74,null,72,null,
+    69,null,67,null, 64,null,67,69, null,null,72,null, 69,null,null,null];
+  const ROOT=[45,41,43,40];
+  const BASS=[0,null,null,12, null,null,0,null, 0,null,null,12, null,7,null,null];
+  function noise(){
+    if(noiseBuf)return noiseBuf;
+    noiseBuf=ac.createBuffer(1,ac.sampleRate*0.3,ac.sampleRate);
+    const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return noiseBuf;
+  }
+  function tone(f,t,d,type,v){
+    const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+    o.connect(g).connect(master);o.start(t);o.stop(t+d+0.02);
+  }
+  function hit(t,freq,d,v){
+    const n=ac.createBufferSource();n.buffer=noise();const f=ac.createBiquadFilter();f.type="bandpass";f.frequency.value=freq;f.Q.value=1.2;
+    const g=ac.createGain();g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+    n.connect(f).connect(g).connect(master);n.start(t);n.stop(t+d+0.02);
+  }
+  function kick(t){
+    const o=ac.createOscillator(),g=ac.createGain();o.frequency.setValueAtTime(130,t);o.frequency.exponentialRampToValueAtTime(45,t+0.15);
+    g.gain.setValueAtTime(0.5,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);o.connect(g).connect(master);o.start(t);o.stop(t+0.22);
+  }
+  function schedule(i,t){
+    const s16=i%16,bar=Math.floor(i/16)%4,len=60/(fast?168:132)/4;
+    if(s16===0||s16===8)kick(t);
+    /* 線路の継ぎ目：ガタン・ゴトン */
+    if(s16===0||s16===2||s16===8||s16===10)hit(t,s16%8===0?420:300,0.09,0.35);
+    if(s16===4||s16===12)hit(t,6000,0.05,0.12);
+    if(s16%2===1)hit(t,8000,0.02,0.05);
+    const b=BASS[s16];if(b!==null)tone(hz(ROOT[bar]+b),t,len*1.8,"triangle",0.28);
+    const m=MEL[i%64];if(m!==null)tone(hz(m),t,len*1.6,"square",0.07);
+  }
+  function tick(){
+    while(next<ac.currentTime+0.12){schedule(step,next);next+=60/(fast?168:132)/4;step++}
+  }
+  function vol(){
+    const v=(cfg.vol/100)*(cfg.judge==="voice"?0.5:1);
+    if(master)master.gain.value=v*0.6;
+    bgmEl.volume=Math.min(1,v);
+  }
+  return{
+    volume:vol,
+    play(){
+      if(cfg.bgm==="off")return;vol();
+      if(cfg.bgm==="file"){if(bgmEl.src&&bgmEl.paused){bgmEl.playbackRate=fast?1.15:1;bgmEl.play().catch(()=>{})}return}
+      if(!ac||playing)return;
+      if(!master){master=ac.createGain();master.connect(ac.destination)}
+      vol();playing=true;next=ac.currentTime+0.05;timer=setInterval(tick,25);
+    },
+    pause(){playing=false;clearInterval(timer);if(!bgmEl.paused)bgmEl.pause()},
+    stop(){this.pause();step=0;try{bgmEl.currentTime=0}catch(e){}},
+    fast(on){if(fast===on)return;fast=on;if(cfg.bgm==="file")bgmEl.playbackRate=on?1.15:1}
+  };
+})();
+
+/* ---------- game ---------- */
+let G=null,tId=null,wake=null;
+function customQs(){
+  return cfg.custom.split(/\n/).map(l=>l.split(/[=＝]/)).filter(p=>p.length>=2&&p[0].trim()&&p[1].trim()).map(p=>[p[0].trim(),p.slice(1).join("=").trim(),"c"]);
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function buildDeck(){return shuffle([...Q,...customQs()].filter(q=>cfg.cats.includes(q[2])))}
+
+function start(){
+  const names=cfg.players.map((n,i)=>n.trim()||("乗客"+(i+1)));
+  if(names.length<2){$("setupMsg").textContent="乗客は2人以上にしてください。";return}
+  const deck=buildDeck();
+  if(deck.length<5){$("setupMsg").textContent="出題できる問題が少なすぎます。路線を増やすか、オリジナル問題を追加してください。";return}
+  $("setupMsg").textContent="";
+  try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}
+  try{navigator.wakeLock&&navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{})}catch(e){}
+  G={players:names.map(n=>({name:n,ok:0,miss:0})),deck,di:0,turn:0,station:0,streak:0,best:0,missed:[],prev:"始発",lock:false};
+  bgm.stop();show("play");sfx.start();nextQ();
+}
+function show(id){["setup","play","result"].forEach(s=>$(s).hidden=s!==id);window.scrollTo(0,0)}
+function cur(){return G.players[G.turn]}
+function q(){return G.deck[G.di%G.deck.length]}
+function nextQ(){
+  G.lock=false;G.station++;
+  if(G.di>0&&G.di%G.deck.length===0)shuffle(G.deck);
+  const p=cur(),item=q();
+  $("stNo").textContent=G.station;$("streak").textContent=G.streak;
+  $("who").innerHTML=`${esc(p.name)} さん<span class="misses">${Array.from({length:cfg.lives},(_,i)=>`<i class="${i<p.miss?"on":""}"></i>`).join("")}</span>`;
+  $("abbr").textContent=item[0];$("line").textContent=CATS[item[2]]+"線";
+  $("prev").textContent="← "+G.prev;
+  $("peek").classList.remove("on");$("peek").textContent="判定役：ここを押している間だけ正解が見えます";
+  const s=$("sign");s.classList.remove("flash-ok","flash-miss");
+  bgm.fast(false);bgm.play();runTimer();listen();
+}
+function runTimer(){
+  clearInterval(tId);const bar=$("bar"),tm=$("timer");tm.classList.remove("low");
+  if(!cfg.time){tm.hidden=true;return}
+  tm.hidden=false;const total=cfg.time*1000,t0=performance.now();let lastSec=cfg.time;
+  bar.style.transform="scaleX(1)";
+  tId=setInterval(()=>{
+    const left=total-(performance.now()-t0);
+    bar.style.transform=`scaleX(${Math.max(0,left/total)})`;
+    const sec=Math.ceil(left/1000);
+    if(sec<lastSec){lastSec=sec;if(sec<=3&&sec>0){sfx.tick();tm.classList.add("low");bgm.fast(true)}}
+    if(left<=0){clearInterval(tId);judge(false,true)}
+  },50);
+}
+function judge(ok,timeout){
+  if(!G||G.lock)return;G.lock=true;clearInterval(tId);stopListen();
+  const p=cur(),item=q();const s=$("sign");
+  if(ok){
+    p.ok++;G.streak++;G.best=Math.max(G.best,G.streak);sfx.ok();buzz(30);
+    s.classList.remove("flash-ok");void s.offsetWidth;s.classList.add("flash-ok");
+    $("line").textContent=disp(item[1]);if(voiceOn())$("heardText").textContent="正解！ "+disp(item[1]);
+    G.prev=item[0];G.di++;G.turn=(G.turn+1)%G.players.length;
+    setTimeout(nextQ,700);
+  }else{
+    p.miss++;G.streak=0;bgm.pause();sfx.miss();buzz([80,60,120]);
+    s.classList.remove("flash-miss");void s.offsetWidth;s.classList.add("flash-miss");
+    G.missed.push({who:p.name,a:item[0],b:disp(item[1])});
+    G.prev=item[0];G.di++;
+    if(p.miss>=cfg.lives){setTimeout(finish,600);return}
+    $("ovTitle").innerHTML=`<span class="bad">${timeout?"時間切れ！":"ミス！"}</span><br>${esc(p.name)} さん`;
+    $("ovAns").textContent=`${item[0]} ＝ ${disp(item[1])}`;
+    $("ovSub").textContent=`あと ${cfg.lives-p.miss} 回ミスで終点です。${esc(p.name)} さんから仕切り直します。`;
+    $("ov").hidden=false;
+  }
+}
+$("ovBtn").onclick=()=>{$("ov").hidden=true;nextQ()};
+function finish(){
+  clearInterval(tId);bgm.stop();try{wake&&wake.release()}catch(e){}
+  const loser=cur();$("loser").textContent=loser.name+" さん";rollTask();
+  $("rTotal").textContent=G.station+" 駅";$("rBest").textContent=G.best+" 問";
+  $("rTable").innerHTML=G.players.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.ok}</td><td>${p.miss}</td></tr>`).join("");
+  $("rMissed").innerHTML=G.missed.map(m=>`<li><span><b>${esc(m.a)}</b>（${esc(m.who)}）</span><span>${esc(m.b)}</span></li>`).join("");
+  $("missCard").hidden=!G.missed.length;
+  show("result");
+}
+function rollTask(){$("task").textContent=PENALTY[Math.floor(Math.random()*PENALTY.length)]}
+function disp(a){return a.split("|")[0]}
+function norm(t){
+  return t.normalize("NFKC").toLowerCase()
+    .replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60))
+    .replace(/[\sー\-‐－―・･、。,.!！?？「」『』()（）×~〜'"&＋+]/g,"");
+}
+function variants(ans){
+  const out=new Set();
+  ans.split("|").forEach(v=>{out.add(norm(v));out.add(norm(v.replace(/（[^）]*）/g,"")))});
+  return [...out].filter(Boolean);
+}
+function lev(a,b){
+  const m=a.length,n=b.length;let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){const cur=[i];for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur}
+  return prev[n];
+}
+function matches(said,ans){
+  const t=norm(said);if(!t)return false;
+  return variants(ans).some(a=>{
+    if(t.includes(a))return true;
+    if(a.length<=3)return false;
+    for(let L=Math.max(1,a.length-2);L<=a.length+2;L++){
+      for(let i=0;i+L<=t.length;i++){if(1-lev(t.slice(i,i+L),a)/Math.max(L,a.length)>=0.8)return true}
+      if(t.length<L&&1-lev(t,a)/Math.max(t.length,a.length)>=0.8)return true;
+    }
+    return false;
+  });
+}
+let rec=null,recActive=false;
+function voiceOn(){return cfg.judge==="voice"&&SR&&!voiceBroken}
+function listen(){
+  stopListen();
+  const h=$("heard");h.hidden=!voiceOn();if(!voiceOn())return;
+  h.classList.remove("off");$("heardText").textContent="聞き取り中…";
+  try{rec=new SR()}catch(e){voiceFail();return}
+  rec.lang="ja-JP";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=5;recActive=true;
+  const r=rec;
+  r.onresult=e=>{
+    if(r!==rec||!G||G.lock)return;
+    const cands=[];let joined="";
+    for(let i=0;i<e.results.length;i++){joined+=e.results[i][0].transcript;for(let j=0;j<e.results[i].length;j++)cands.push(e.results[i][j].transcript)}
+    cands.push(joined);
+    $("heardText").textContent="「"+(e.results[e.results.length-1][0].transcript)+"」";
+    if(cands.some(c=>matches(c,q()[1])))judge(true);
+  };
+  r.onerror=ev=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
+  r.onend=()=>{if(r===rec&&recActive&&voiceOn()&&G&&!G.lock){try{r.start()}catch(e){}}};
+  try{r.start()}catch(e){}
+}
+function voiceFail(){
+  voiceBroken=true;stopListen();
+  const h=$("heard");h.hidden=false;h.classList.add("off");
+  $("heardText").textContent="マイクが使えないため、手動判定に切り替えました";
+}
+function stopListen(){recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+/* peek: press and hold */
+const pk=$("peek");
+const on=e=>{e.preventDefault();if(!G)return;pk.classList.add("on");pk.textContent=disp(q()[1])};
+const off=()=>{pk.classList.remove("on");pk.textContent="判定役：ここを押している間だけ正解が見えます"};
+pk.addEventListener("pointerdown",on);["pointerup","pointerleave","pointercancel"].forEach(ev=>pk.addEventListener(ev,off));
+pk.addEventListener("contextmenu",e=>e.preventDefault());
+
+$("okBtn").onclick=()=>judge(true);
+$("ngBtn").onclick=()=>judge(false);
+$("startBtn").onclick=start;
+$("quit").onclick=()=>{clearInterval(tId);stopListen();bgm.stop();G=null;$("ov").hidden=true;show("setup")};
+$("again").onclick=start;
+$("toSetup").onclick=()=>{G=null;show("setup")};
+$("reroll").onclick=rollTask;
+
+renderAll();
+</script>
+</body>
+</html>
