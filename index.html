@@ -166,6 +166,8 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
       <p class="hint" id="judgeHint"></p>
       <div class="row"><label>問題の読み上げ</label><div class="chips" id="ttsMode"></div></div>
+      <div class="row"><label>音声認識の場所</label><div class="chips" id="recWhere"></div></div>
+      <div class="filebox"><span class="hint" id="localStatus">端末内の音声認識を確認しています…</span><button class="chip" id="installBtn" type="button" hidden>日本語データを入れる</button></div>
       <div class="row"><label>マイク入力バー（診断用）</label><div class="chips" id="meterMode"></div></div>
     </div>
 
@@ -303,7 +305,7 @@ const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",sound:"pack",vol:60,tts:true,meter:true,bpm:144,offset:0.025},store.get("ryakugo-cfg",{}));
+let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",sound:"pack",vol:60,tts:true,meter:true,recWhere:"local",bpm:144,offset:0.025},store.get("ryakugo-cfg",{}));
 let voiceBroken=false;
 
 /* ---------- setup UI ---------- */
@@ -330,6 +332,8 @@ function renderAll(){
   chipGroup($("judgeMode"),[["voice","音声で自動"],["manual","判定役が手動"]],v=>cfg.judge===v,v=>cfg.judge=v);
   chipGroup($("ttsMode"),[[true,"オン"],[false,"オフ"]],v=>cfg.tts===v,v=>cfg.tts=v);
   chipGroup($("meterMode"),[[true,"表示"],[false,"表示しない"]],v=>cfg.meter===v,v=>cfg.meter=v);
+  chipGroup($("recWhere"),[["local","端末内（精度重視）"],["cloud","クラウド"]],v=>cfg.recWhere===v,v=>cfg.recWhere=v);
+  localUI();
   chipGroup($("soundMode"),[["pack","sound フォルダの音源"],["orig","オリジナル音源"],["off","効果音だけ"]],v=>cfg.sound===v,v=>cfg.sound=v);
   $("vol").value=cfg.vol;
   $("soundHint").textContent=cfg.sound==="pack"
@@ -766,6 +770,56 @@ function grade(said,ans){
 }
 function matches(said,ans){return grade(said,ans)>0}
 const FILLERS=["えー","えーと","えっと","あー","あの","あのー","うーん","んー","えっ","ええと","なんだっけ"].map(x=>x);
+/* ---------- 端末内の音声認識（Chrome 139 以降） ---------- */
+/* localState: available（使える）/ downloadable（データを入れれば使える）/ downloading / unavailable / unsupported / checking */
+let localState="checking",localBroken=false;
+function localApi(){
+  if(!SR)return null;
+  if(typeof SR.available==="function")return{
+    check:()=>SR.available({langs:["ja-JP"],processLocally:true}),
+    install:()=>SR.install({langs:["ja-JP"],processLocally:true})};
+  if(typeof SR.availableOnDevice==="function")return{
+    check:()=>SR.availableOnDevice("ja-JP"),
+    install:()=>SR.installOnDevice("ja-JP")};
+  return null;
+}
+function checkLocal(){
+  const api=localApi();
+  if(!api){localState="unsupported";localUI();return}
+  localState="checking";localUI();
+  Promise.resolve().then(api.check).then(v=>{localState=String(v||"unavailable");localUI()})
+    .catch(()=>{localState="unavailable";localUI()});
+}
+function useLocal(){return cfg.recWhere==="local"&&localState==="available"&&!localBroken}
+function localUI(){
+  const el=$("localStatus"),btn=$("installBtn");if(!el)return;
+  const M={
+    checking:"端末内の音声認識を確認しています…",
+    available:"端末内の音声認識が使えます。通信なしで認識し、出題中の正解を優先して聞き取ります。",
+    downloadable:"日本語の認識データを入れると、端末内で認識できます（初回のみダウンロード）。",
+    downloading:"日本語の認識データをダウンロードしています…",
+    unavailable:"この端末では日本語の端末内認識が使えません。クラウドで認識します。",
+    unsupported:"このブラウザは端末内の音声認識に対応していません（Chrome 139 以降が必要）。クラウドで認識します。"};
+  el.textContent=(M[localState]||("端末内認識の状態："+localState))+(localBroken?" 端末内認識でエラーが出たため、クラウドに切り替えました。":"");
+  if(cfg.recWhere!=="local")el.textContent="クラウド（Google のサーバー）で認識します。";
+  btn.hidden=!(cfg.recWhere==="local"&&localState==="downloadable");
+}
+$("installBtn").onclick=()=>{
+  const api=localApi();if(!api)return;
+  localState="downloading";localUI();
+  Promise.resolve().then(api.install).then(ok=>{if(ok===false){localState="unavailable";localUI()}else checkLocal()})
+    .catch(()=>{localState="unavailable";localUI()});
+};
+/* 出題中の正解（と別解）を優先語として渡す */
+function phrasesFor(item){
+  if(!item)return[];
+  const out=new Set();
+  item[1].split("|").forEach(v=>{out.add(v.replace(/（[^）]*）/g,"").trim())});
+  return [...out].filter(Boolean).map(t=>{
+    try{return typeof SpeechRecognitionPhrase==="function"?new SpeechRecognitionPhrase(t,6.0):{phrase:t,boost:6.0}}catch(e){return{phrase:t,boost:6.0}}
+  });
+}
+
 let rec=null,recActive=false,recFinal=0,recPending="",recRestarts=0,lastSpeechEvt=0,wdCount=0,voiceSince=0;
 /* 診断表示：認識の状態と、いま判定を受け付けているか */
 function recStat(t,err){const el=$("recState");if(!el)return;el.textContent=t;el.classList.toggle("err",!!err)}
@@ -776,8 +830,15 @@ function ensureRec(){
   if(!voiceOn()||rec)return;
   try{rec=new SR()}catch(e){voiceFail();return}
   rec.lang="ja-JP";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=5;recActive=true;recFinal=0;
+  const local=useLocal();
+  if(local){
+    try{rec.processLocally=true}catch(e){}
+    /* 優先語は認識を作るたびに入れ直す（判定ごとに作り直すので、次の問題の正解が入る） */
+    try{const ph=phrasesFor(G&&G.deck?q():null);if("phrases" in rec)rec.phrases=ph}catch(e){}
+  }
+  rec._where=local?"端末内":"クラウド";
   const r=rec;
-  r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中")};
+  r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中（"+r._where+"）")};
   r.onaudiostart=()=>recStat("認識：マイク受信中");
   r.onspeechstart=()=>{lastSpeechEvt=clock();recStat("認識：声を検出")};
   r.onspeechend=()=>recStat("認識：マイク受信中");
@@ -805,7 +866,9 @@ function ensureRec(){
     const skip=t.length<2||FILLERS.some(x=>norm(x)===t);
     if(!skip)G.answered=true;
   };
-  r.onerror=ev=>{recStat("エラー："+ev.error,true);if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
+  r.onerror=ev=>{recStat("エラー："+ev.error+"（"+r._where+"）",true);
+    /* 端末内認識が使えないと分かったら、クラウドに切り替えて作り直す */
+    if(r._where==="端末内"&&/language-not-supported|phrases-not-supported|service-not-allowed/.test(ev.error)){localBroken=true;localUI();recRefresh("端末内認識が使えないため、クラウドに切り替えました");return}if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
   r.onend=()=>{
     recRestarts++;recStat(`認識：停止→再開（${recRestarts}回目）`,true);
     if(r===rec&&recActive&&voiceOn()&&G){try{r.start()}catch(e){recStat("認識：再開に失敗",true)}}
@@ -856,6 +919,7 @@ $("toSetup").onclick=()=>{G=null;show("setup")};
 $("reroll").onclick=rollTask;
 
 renderAll();
+checkLocal();
 </script>
 </body>
 </html>
