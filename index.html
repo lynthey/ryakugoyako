@@ -943,7 +943,7 @@ function ensureRec(){
     /* 読み上げ中に聞こえた途中の文字が先頭に残っていたら取り除く */
     if(G.prefix&&joined.startsWith(G.prefix))joined=joined.slice(G.prefix.length);
     cands.push(joined);
-    $("heardText").textContent="「"+joined+"」";
+    {const shown=kanaDisplayStrip(joined);$("heardText").textContent=shown?"「"+shown+"」":"聞き取り中…"}
     /* 英単語をカタカナに置き換えた候補も足す（英語とカタカナの混ざった認識に対応） */
     cands.slice().forEach(c=>{if(/[A-Za-z]/.test(c)){const k=kanaizeEn(c);if(k!==c)cands.push(k)}});
     /* すべての候補を採点し、一番良い点を使う */
@@ -960,9 +960,11 @@ function ensureRec(){
       const gg=G;G.closeT=setTimeout(()=>{if(G===gg&&!gg.lock&&gg.closePending)judge(true,false,true)},400);
       return;
     }
-    /* 何か答えたかを記録する。読み上げの略語・つなぎ言葉だけなら数えない */
-    const abbr=norm(q()[0]);let t=norm(joined);if(abbr)t=t.split(abbr).join("");
-    const skip=t.length<2||FILLERS.some(x=>norm(x)===t);
+    /* 何か答えたかを記録する。
+       読み上げの声（略語そのもの・その読み方）と、つなぎ言葉だけなら数えない。
+       また、読み上げ直後0.35秒は読み上げの残響の可能性があるので数えない */
+    const t=stripEcho(joined);
+    const skip=t.length<2||FILLERS.some(x=>norm(x)===t)||clock()-(G.hearFrom||0)<0.35;
     if(!skip)G.answered=true;
   };
   r.onerror=ev=>{recStat("エラー："+ev.error+"（"+r._where+"）",true);
@@ -974,12 +976,26 @@ function ensureRec(){
   };
   try{r.start()}catch(e){}
 }
+/* 読み上げた略語（表記と読み方の両方）を、聞き取った文字から取り除く */
+/* 表示用：読み上げた略語をそのままの表記で取り除く（空白は詰める） */
+function kanaDisplayStrip(text){
+  if(!G||!G.deck)return text;
+  const ab=q()[0];let t=text;
+  [ab,YOMI[ab]||""].filter(Boolean).forEach(w=>{t=t.split(w).join("")});
+  return t.trim();
+}
+function stripEcho(text){
+  let t=norm(text);if(!G||!G.deck)return t;
+  const ab=q()[0];
+  [norm(ab),YOMI[ab]?norm(YOMI[ab]):""].filter(Boolean).forEach(w=>{t=t.split(w).join("")});
+  return t;
+}
 /* この問題の聞き取りを始める。マイクと認識は常に動かしたままで、ここから先の結果だけを判定に使う */
 function listen(){
   const h=$("heard");h.hidden=!voiceOn();if(!voiceOn())return;
   ensureRec();
   h.classList.remove("off");$("heardText").textContent="聞き取り中…";
-  G.base=recFinal;G.prefix=recPending;G.hearing=true;accStat();
+  G.base=recFinal;G.prefix=recPending;G.hearing=true;G.hearFrom=clock();accStat();
   bgm.duck(true);
   if(G.lastBeat>=0&&G.lastBeat<8)renderBeats(G.lastBeat);
 }
