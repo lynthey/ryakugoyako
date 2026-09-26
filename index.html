@@ -159,8 +159,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
 
     <div class="card">
       <h2>ルール</h2>
-      <div class="row"><label for="bpm">テンポ（BPM）</label>
-        <div class="bpmrow"><input type="range" id="bpm" min="80" max="200" step="1"><b id="bpmVal"></b><button class="chip" id="tapBtn" type="button">タップで測る</button></div></div>
+      <div class="row"><label>テンポ（BPM）</label><div class="chips" id="bpmMode"></div></div>
       <p class="hint">4拍子2小節（8拍）で1問です。1〜4拍目で問題を読み上げます。読み上げ中の音は判定に使わず、読み終わった瞬間から回答を受け付けます。8拍目が終わるまでに正解すると ok1（惜しい正解は ok3）、間に合わなければミスです。</p>
       <div class="row"><label>何回ミスで終点？</label><div class="chips" id="lives"></div></div>
       <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
@@ -381,8 +380,11 @@ const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","g","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",sound:"pack",vol:60,tts:true,meter:true,recWhere:"local",bpm:144,offset:0.025},store.get("ryakugo-cfg",{}));
+let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","g","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",sound:"pack",vol:60,tts:true,meter:true,recWhere:"local",bpm:120,offset:0.025},store.get("ryakugo-cfg",{}));
 let voiceBroken=false;
+/* テンポは 90〜130 の5段階。以前の自由な値は近い段階に丸める */
+const BPMS=[90,100,110,120,130];
+if(!BPMS.includes(cfg.bpm))cfg.bpm=120;
 /* 新しい路線「実は略語」を、以前の設定を持つ人にも一度だけ追加する */
 if(!cfg.catsV2){if(!cfg.cats.includes("g"))cfg.cats.push("g");cfg.catsV2=true;try{localStorage.setItem("ryakugo-cfg",JSON.stringify(cfg))}catch(e){}}
 
@@ -405,7 +407,7 @@ function chipGroup(el,items,isOn,onTap){
 function renderAll(){
   renderPlayers();
   chipGroup($("cats"),Object.entries(CATS),v=>cfg.cats.includes(v),v=>{cfg.cats=cfg.cats.includes(v)?cfg.cats.filter(c=>c!==v):[...cfg.cats,v]});
-  $("bpm").value=cfg.bpm;$("bpmVal").textContent=cfg.bpm;
+  chipGroup($("bpmMode"),BPMS.map(v=>[v,String(v)]),v=>cfg.bpm===v,v=>cfg.bpm=v);
   chipGroup($("lives"),[[1,"1回"],[2,"2回"],[3,"3回"]],v=>cfg.lives===v,v=>cfg.lives=v);
   chipGroup($("judgeMode"),[["voice","音声で自動"],["manual","判定役が手動"]],v=>cfg.judge===v,v=>cfg.judge=v);
   chipGroup($("ttsMode"),[[true,"オン"],[false,"オフ"]],v=>cfg.tts===v,v=>cfg.tts=v);
@@ -428,19 +430,12 @@ function renderAll(){
 function save(){store.set("ryakugo-cfg",cfg)}
 $("addP").onclick=()=>{cfg.players.push("ともだち"+cfg.players.length);save();renderPlayers()};
 $("custom").oninput=e=>{cfg.custom=e.target.value;save()};
-$("bpm").oninput=e=>{cfg.bpm=+e.target.value;$("bpmVal").textContent=cfg.bpm;save()};
-let taps=[];
-$("tapBtn").onclick=()=>{
-  const t=performance.now();taps=taps.filter(x=>t-x<3000);taps.push(t);
-  if(taps.length>=4){
-    const d=(taps[taps.length-1]-taps[0])/(taps.length-1);
-    cfg.bpm=Math.max(80,Math.min(200,Math.round(60000/d)));$("bpm").value=cfg.bpm;$("bpmVal").textContent=cfg.bpm;save();
-  }
-  $("tapBtn").textContent=taps.length<4?`あと${4-taps.length}回`:"タップで測る";
-};
 $("vol").oninput=e=>{cfg.vol=+e.target.value;save();bgm.volume()};
 
 /* ---------- sound pack（sound フォルダの mp3） ---------- */
+/* bgm1.mp3 の元のテンポ。選んだテンポに合わせて再生速度を変える（音程は変えない） */
+const PACK_BPM=144;
+function bgmRate(){return cfg.bpm/PACK_BPM}
 const PACK={s1:"sound/s1.mp3",bgm1:"sound/bgm1.mp3",ok1:"sound/ok1.mp3",ok2:"sound/ok2.mp3",ok3:"sound/ok3.mp3",ng1:"sound/ng1.mp3",ng2:"sound/ng2.mp3"};
 const snd={},ready={};
 Object.keys(PACK).forEach(k=>{
@@ -573,6 +568,7 @@ const bgm=(()=>{
       if(cfg.sound==="off")return;
       if(usePack("bgm1")){
         const a=snd.bgm1;if(!a.paused)return;a.volume=bgmVol();
+        try{a.preservesPitch=true;a.playbackRate=bgmRate()}catch(e){}
         a.play().catch(()=>{ready.bgm1=false;synthPlay()});return;
       }
       synthPlay();
@@ -736,7 +732,7 @@ function nextQ(){
   const s=$("sign");s.classList.remove("flash-ok","flash-miss");
   bgm.play();
   /* 拍の基準時刻：BGMの再生開始（+ 音源の最初の拍までのずれ） */
-  if(G.t0==null)G.t0=clock()+(cfg.sound==="pack"&&usePack("bgm1")?cfg.offset:0.05);
+  if(G.t0==null)G.t0=clock()+(cfg.sound==="pack"&&usePack("bgm1")?cfg.offset/bgmRate():0.05);
   /* 4拍子2小節（8拍）単位で区切り、次の区切りから1問を始める */
   /* ジングル直後の1問目は、BGMの1拍目からすぐ始める */
   G.cs=G.fresh?G.t0:(G.nextCs!=null?G.nextCs:nextCycle(0.03));G.nextCs=null;G.fresh=false;
