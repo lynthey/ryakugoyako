@@ -445,7 +445,9 @@ const PACK={s1:"sound/s1.mp3",bgm1:"sound/bgm1.mp3",ok1:"sound/ok1.mp3",ok2:"sou
 const snd={},ready={};
 Object.keys(PACK).forEach(k=>{
   const a=new Audio();a.preload="auto";ready[k]=null;
-  a.addEventListener("canplaythrough",()=>{if(ready[k]===null){ready[k]=true;packStatus()}});
+  /* Chrome はボタンを押すまで mp3 の冒頭（長さなどの情報）しか読まないので、そこまで読めたら「ある」とみなす */
+  const ok=()=>{if(ready[k]===null){ready[k]=true;packStatus()}};
+  a.addEventListener("loadedmetadata",ok);a.addEventListener("canplaythrough",ok);
   a.addEventListener("error",()=>{ready[k]=false;packStatus()});
   a.src=PACK[k];snd[k]=a;
 });
@@ -456,7 +458,7 @@ function packStatus(){
   const ks=Object.keys(PACK),ok=ks.filter(k=>ready[k]===true).length,ng=ks.filter(k=>ready[k]===false);
   el.textContent=ng.length===ks.length?"sound フォルダの音源が見つからないため、オリジナル音源で鳴らします。"
     :ng.length?`読み込めなかったファイル：${ng.map(k=>PACK[k].replace("sound/","")).join("、")}（オリジナル音源で代わりに鳴らします）`
-    :ok===ks.length?`sound フォルダの音源 ${ks.length} ファイルを読み込みました。`:"sound フォルダの音源を確認しています…";
+    :ok===ks.length?`sound フォルダの音源 ${ks.length} ファイルを読み込みました。`:"sound フォルダの音源を確認しています…（このまま開始しても大丈夫です）";
 }
 function usePack(k){return cfg.sound==="pack"&&ready[k]!==false}
 function sfxVol(){return Math.min(1,cfg.vol/100)}
