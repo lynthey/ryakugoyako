@@ -932,8 +932,10 @@ function ensureRec(){
   }
   rec._where=local?"端末内":"クラウド";
   const r=rec;
-  r.onstart=()=>{r._startAt=clock();recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中（"+r._where+"）")};
-  r.onaudiostart=()=>recStat("認識：マイク受信中");
+  r.onstart=()=>{r._startAt=clock();recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中（"+r._where+"）");
+    /* 起動したのにマイクの音が届かないまま（Chrome の音声処理が固まっているとき）なら知らせる */
+    clearTimeout(r._audioT);r._audioT=setTimeout(()=>{if(r===rec&&!r._audio)recStat("認識：マイクの音が届いていません。Chrome を完全に終了して起動し直してください",true)},5000)};
+  r.onaudiostart=()=>{r._audio=true;clearTimeout(r._audioT);recStat("認識：マイク受信中")};
   r.onspeechstart=()=>{lastSpeechEvt=clock();recStat("認識：声を検出")};
   r.onspeechend=()=>recStat("認識：マイク受信中");
   r.onresult=e=>{
@@ -976,10 +978,14 @@ function ensureRec(){
     const skip=t.length<2||FILLERS.some(x=>norm(x)===t)||clock()-(G.hearFrom||0)<0.35;
     if(!skip)G.answered=true;
   };
-  r.onerror=ev=>{recLastErr=ev.error;recStat("エラー："+ev.error+"（"+r._where+"）",true);
+  r.onerror=ev=>{
+    /* 判定ごとの作り直しで自分から止めた分（aborted）はエラーとして表示しない */
+    if(r!==rec||ev.error==="aborted")return;
+    recLastErr=ev.error;recStat("エラー："+ev.error+"（"+r._where+"）",true);
     /* 端末内認識が使えないと分かったら、クラウドに切り替えて作り直す */
     if(r._where==="端末内"&&/language-not-supported|phrases-not-supported|service-not-allowed/.test(ev.error)){localBroken=true;localUI();recRefresh("端末内認識が使えないため、クラウドに切り替えました");return}if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
   r.onend=()=>{
+    clearTimeout(r._audioT);
     if(r!==rec||!recActive||!voiceOn()||!G)return;
     recRestarts++;
     /* 起動して1秒以内に止まったら「空回り」として数える */
