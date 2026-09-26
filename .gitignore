@@ -1,5 +1,4 @@
-sound/
-*.mp3
+sound/_archive/
 *.m4a
 *.wav
 *.aac
