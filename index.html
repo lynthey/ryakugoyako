@@ -443,13 +443,19 @@ const PACK_BPM=144;
 function bgmRate(){return cfg.bpm/PACK_BPM}
 const PACK={s1:"sound/s1.mp3",bgm1:"sound/bgm1.mp3",ok1:"sound/ok1.mp3",ok2:"sound/ok2.mp3",ok3:"sound/ok3.mp3",ng1:"sound/ng1.mp3",ng2:"sound/ng2.mp3"};
 const snd={},ready={};
+/* mp3 は最初に丸ごとダウンロードして、メモリ上のデータとして再生する。
+   音声要素に直接ファイルを読ませると、読み込み途中の接続が残り続け、
+   Chrome の同時接続数の上限（1サーバーあたり6本）に達して再生が止まることがあるため */
 Object.keys(PACK).forEach(k=>{
-  const a=new Audio();a.preload="auto";ready[k]=null;
-  /* Chrome はボタンを押すまで mp3 の冒頭（長さなどの情報）しか読まないので、そこまで読めたら「ある」とみなす */
-  const ok=()=>{if(ready[k]===null){ready[k]=true;packStatus()}};
-  a.addEventListener("loadedmetadata",ok);a.addEventListener("canplaythrough",ok);
-  a.addEventListener("error",()=>{ready[k]=false;packStatus()});
-  a.src=PACK[k];snd[k]=a;
+  const a=new Audio();a.preload="none";ready[k]=null;snd[k]=a;
+  a.addEventListener("error",()=>{if(a.src){ready[k]=false;packStatus()}});
+  fetch(PACK[k]).then(r=>{if(!r.ok)throw new Error(r.status);return r.blob()})
+    .then(b=>{a.src=URL.createObjectURL(b);a.preload="auto";ready[k]=true;packStatus()})
+    .catch(()=>{
+      /* ファイルを直接開いた場合（file://）は fetch が使えないので、音声要素に直接読ませる */
+      if(location.protocol==="file:"){a.src=PACK[k];ready[k]=true}else ready[k]=false;
+      packStatus();
+    });
 });
 snd.bgm1.loop=true;
 function packStatus(){
