@@ -92,9 +92,19 @@ input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px soli
 .filebox{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .filebox .btn{cursor:pointer;text-align:center}
 input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
-.heard{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;min-height:24px}
+.heard{display:flex;flex-direction:column;align-items:stretch;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;min-height:24px}
 .heard .dot{width:10px;height:10px;border-radius:50%;background:var(--miss);flex:none;animation:rec 1s infinite}
 .heard.off .dot{background:var(--muted);animation:none}
+.heard .line1{display:flex;align-items:center;gap:10px}
+.mic{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mic .tag{letter-spacing:.12em;font-weight:700}
+.micbar{flex:1;height:8px;background:var(--line);border-radius:99px;overflow:hidden;min-width:60px}
+.micbar i{display:block;height:100%;width:0;background:var(--ok);transition:width .05s linear}
+.micbar.hot i{background:var(--lamp)}
+.mic .st{white-space:nowrap}
+.mic .st.err{color:var(--miss);font-weight:700}
+.mic .acc{padding:1px 6px;border-radius:99px;border:1px solid var(--line);white-space:nowrap}
+.mic .acc.on{border-color:var(--ok);color:var(--ok)}
 @keyframes rec{50%{opacity:.25}}
 .peek{font:inherit;font-size:14px;background:transparent;color:var(--muted);border:1px dashed var(--line);border-radius:12px;padding:14px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;min-height:52px}
 .peek.on{color:var(--ink);border-color:var(--lamp);font-weight:700;font-size:18px}
@@ -156,6 +166,7 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <div class="row"><label>判定方式</label><div class="chips" id="judgeMode"></div></div>
       <p class="hint" id="judgeHint"></p>
       <div class="row"><label>問題の読み上げ</label><div class="chips" id="ttsMode"></div></div>
+      <div class="row"><label>マイク入力バー（診断用）</label><div class="chips" id="meterMode"></div></div>
     </div>
 
     <div class="card">
@@ -192,7 +203,10 @@ input[type=range]{flex:1;min-width:120px;accent-color:var(--lamp)}
       <div class="phase"><span>読み上げ</span><span>回答</span><span>締切</span></div>
       <div class="label" id="beatLabel"></div>
     </div>
-    <div class="heard" id="heard" hidden><span class="dot"></span><span id="heardText">聞き取り中…</span></div>
+    <div class="heard" id="heard" hidden>
+      <div class="line1"><span class="dot"></span><span id="heardText">聞き取り中…</span></div>
+      <div class="mic" id="micRow"><span class="tag">MIC</span><div class="micbar" id="micBar"><i id="micLevel"></i></div><span class="st" id="recState">認識：未起動</span><span class="acc" id="accState">待機</span></div>
+    </div>
     <button class="peek" id="peek" type="button">判定役：ここを押している間だけ正解が見えます</button>
     <div class="judge">
       <button class="ok" id="okBtn" type="button">○<small>正解</small></button>
@@ -289,7 +303,7 @@ const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",sound:"pack",vol:60,tts:true,bpm:144,offset:0.025},store.get("ryakugo-cfg",{}));
+let cfg=Object.assign({players:["あなた","ともだち1","ともだち2"],cats:["d","f","e","o","n","c"],time:7,lives:2,custom:"",judge:SR?"voice":"manual",sound:"pack",vol:60,tts:true,meter:true,bpm:144,offset:0.025},store.get("ryakugo-cfg",{}));
 let voiceBroken=false;
 
 /* ---------- setup UI ---------- */
@@ -315,6 +329,7 @@ function renderAll(){
   chipGroup($("lives"),[[1,"1回"],[2,"2回"],[3,"3回"]],v=>cfg.lives===v,v=>cfg.lives=v);
   chipGroup($("judgeMode"),[["voice","音声で自動"],["manual","判定役が手動"]],v=>cfg.judge===v,v=>cfg.judge=v);
   chipGroup($("ttsMode"),[[true,"オン"],[false,"オフ"]],v=>cfg.tts===v,v=>cfg.tts=v);
+  chipGroup($("meterMode"),[[true,"表示"],[false,"表示しない"]],v=>cfg.meter===v,v=>cfg.meter=v);
   chipGroup($("soundMode"),[["pack","sound フォルダの音源"],["orig","オリジナル音源"],["off","効果音だけ"]],v=>cfg.sound===v,v=>cfg.sound=v);
   $("vol").value=cfg.vol;
   $("soundHint").textContent=cfg.sound==="pack"
@@ -559,6 +574,28 @@ function ask(abbr,then){
 }
 function stopTTS(){try{TTS&&TTS.cancel()}catch(e){}}
 
+/* ---------- マイク入力バー（診断用） ---------- */
+let meterStream=null,meterRaf=0;
+function startMeter(){
+  if(!cfg.meter||!voiceOn()||meterStream||!navigator.mediaDevices||!ac)return;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(st=>{
+    meterStream=st;
+    const src=ac.createMediaStreamSource(st),an=ac.createAnalyser();an.fftSize=512;src.connect(an);
+    const buf=new Float32Array(an.fftSize),bar=$("micLevel"),box=$("micBar");let peak=0;
+    const loop=()=>{
+      an.getFloatTimeDomainData(buf);let sum=0;for(let i=0;i<buf.length;i++)sum+=buf[i]*buf[i];
+      const rms=Math.sqrt(sum/buf.length);
+      /* 声の大きさを0〜100%に。-60dB〜-10dB を目安に割り当てる */
+      const db=20*Math.log10(rms+1e-8),lv=Math.max(0,Math.min(1,(db+60)/50));
+      peak=Math.max(lv,peak*0.92);
+      bar.style.width=(peak*100).toFixed(0)+"%";box.classList.toggle("hot",peak>0.85);
+      meterRaf=requestAnimationFrame(loop);
+    };
+    loop();
+  }).catch(e=>recStat("入力バー：マイク取得に失敗（"+(e&&e.name||"不明")+"）",true));
+}
+function stopMeter(){cancelAnimationFrame(meterRaf);meterRaf=0;if(meterStream){meterStream.getTracks().forEach(t=>t.stop());meterStream=null}const b=$("micLevel");if(b)b.style.width="0"}
+
 /* ---------- game ---------- */
 let G=null,tId=null,wake=null;
 function customQs(){
@@ -580,6 +617,7 @@ function start(){
   stopSfx();unlockPack();unlockTTS();
   depart();
   ensureRec();
+  startMeter();
 }
 /* ジングルを流してから次の問題へ（開始時と、ミスのあとの仕切り直し） */
 function depart(){
@@ -611,6 +649,7 @@ function nextQ(){
   /* ジングル直後の1問目は、BGMの1拍目からすぐ始める */
   G.cs=G.fresh?G.t0:(G.nextCs!=null?G.nextCs:nextCycle(0.03));G.nextCs=null;G.fresh=false;
   G.lastBeat=-99;G.late=false;G.listening=false;G.asked=false;
+  if(voiceOn()){$("heard").hidden=false;$("heard").classList.remove("off");$("heardText").textContent="次の問題を待っています";$("micRow").hidden=false;$("micBar").hidden=!cfg.meter;accStat()}
   $("beats").hidden=false;$("beats").classList.remove("late");
   renderBeats(-1);
   startRhythm();
@@ -629,7 +668,7 @@ function startRhythm(){
     const b=60/cfg.bpm,pos=(clock()-g.cs)/b;
     /* 1拍目ちょうどに声が出るよう、音声合成の立ち上がり分だけ早めに読み上げを始める */
     /* 1拍目：略語を表示して読み上げる。読み上げ中はマイクを切り、読み終わった瞬間から回答を受け付ける */
-    if(!g.asked&&pos>=-TTS_LEAD/b&&pos<8){g.asked=true;$("abbr").textContent=q()[0];ask(q()[0],()=>startListening(g,st))}
+    if(!g.asked&&pos>=-TTS_LEAD/b&&pos<8){g.asked=true;accStat();$("abbr").textContent=q()[0];ask(q()[0],()=>startListening(g,st))}
     const beat=Math.floor(pos);
     if(beat!==g.lastBeat){g.lastBeat=beat;onBeat(beat,g,st)}
   },10);
@@ -675,7 +714,7 @@ function judge(ok,timeout,close,answered){
 }
 $("ovBtn").onclick=()=>{$("ov").hidden=true;if(G)depart()};
 function finish(){
-  clearInterval(tId);stopListen();bgm.stop();try{wake&&wake.release()}catch(e){}
+  clearInterval(tId);stopListen();stopMeter();bgm.stop();try{wake&&wake.release()}catch(e){}
   const loser=cur();$("loser").textContent=loser.name+" さん";rollTask();
   $("rTotal").textContent=G.station+" 駅";$("rBest").textContent=G.best+" 問";
   $("rTable").innerHTML=G.players.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.ok}</td><td>${p.miss}</td></tr>`).join("");
@@ -717,7 +756,10 @@ function grade(said,ans){
 }
 function matches(said,ans){return grade(said,ans)>0}
 const FILLERS=["えー","えーと","えっと","あー","あの","あのー","うーん","んー","えっ","ええと","なんだっけ"].map(x=>x);
-let rec=null,recActive=false,recFinal=0,recPending="";
+let rec=null,recActive=false,recFinal=0,recPending="",recRestarts=0;
+/* 診断表示：認識の状態と、いま判定を受け付けているか */
+function recStat(t,err){const el=$("recState");if(!el)return;el.textContent=t;el.classList.toggle("err",!!err)}
+function accStat(){const el=$("accState");if(!el)return;const on=!!(G&&G.hearing);el.textContent=on?"受付中":(G&&G.asked&&!G.lock?"読み上げ中（無視）":"待機");el.classList.toggle("on",on)}
 function voiceOn(){return cfg.judge==="voice"&&SR&&!voiceBroken}
 /* 音声認識はゲーム中ずっと動かし続ける。問題ごとに止めて起動し直すと、立ち上がりの0.5〜1秒を聞き逃すため */
 function ensureRec(){
@@ -725,7 +767,10 @@ function ensureRec(){
   try{rec=new SR()}catch(e){voiceFail();return}
   rec.lang="ja-JP";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=5;recActive=true;recFinal=0;
   const r=rec;
-  r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""}};
+  r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中")};
+  r.onaudiostart=()=>recStat("認識：マイク受信中");
+  r.onspeechstart=()=>recStat("認識：声を検出");
+  r.onspeechend=()=>recStat("認識：マイク受信中");
   r.onresult=e=>{
     if(r!==rec)return;
     /* 確定した結果の数を数えておく（次の問題はここから先だけを見る） */
@@ -749,8 +794,11 @@ function ensureRec(){
     const skip=t.length<2||FILLERS.some(x=>norm(x)===t);
     if(!skip)G.answered=true;
   };
-  r.onerror=ev=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
-  r.onend=()=>{if(r===rec&&recActive&&voiceOn()&&G){try{r.start()}catch(e){}}};
+  r.onerror=ev=>{recStat("エラー："+ev.error,true);if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
+  r.onend=()=>{
+    recRestarts++;recStat(`認識：停止→再開（${recRestarts}回目）`,true);
+    if(r===rec&&recActive&&voiceOn()&&G){try{r.start()}catch(e){recStat("認識：再開に失敗",true)}}
+  };
   try{r.start()}catch(e){}
 }
 /* この問題の聞き取りを始める。マイクと認識は常に動かしたままで、ここから先の結果だけを判定に使う */
@@ -758,7 +806,7 @@ function listen(){
   const h=$("heard");h.hidden=!voiceOn();if(!voiceOn())return;
   ensureRec();
   h.classList.remove("off");$("heardText").textContent="聞き取り中…";
-  G.base=recFinal;G.prefix=recPending;G.hearing=true;
+  G.base=recFinal;G.prefix=recPending;G.hearing=true;accStat();
   bgm.duck(true);
   if(G.lastBeat>=0&&G.lastBeat<8)renderBeats(G.lastBeat);
 }
@@ -768,7 +816,7 @@ function voiceFail(){
   $("heardText").textContent="マイクが使えないため、手動判定に切り替えました";
 }
 /* この問題の聞き取りだけ終える */
-function endHearing(){if(G)G.hearing=false;bgm.duck(false)}
+function endHearing(){if(G)G.hearing=false;bgm.duck(false);accStat()}
 /* 音声認識を完全に止める（ゲーム終了・中断・マイク不可のとき） */
 function stopListen(){endHearing();recActive=false;const r=rec;rec=null;try{r&&r.abort()}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -784,7 +832,7 @@ $("sign").addEventListener("click",()=>{if(G&&G.departing)skipJingle()});
 $("okBtn").onclick=()=>judge(true);
 $("ngBtn").onclick=()=>judge(false);
 $("startBtn").onclick=start;
-$("quit").onclick=()=>{clearInterval(tId);stopListen();stopTTS();bgm.stop();skipJingle();G=null;$("ov").hidden=true;show("setup")};
+$("quit").onclick=()=>{clearInterval(tId);stopListen();stopMeter();stopTTS();bgm.stop();skipJingle();G=null;$("ov").hidden=true;show("setup")};
 $("again").onclick=start;
 $("toSetup").onclick=()=>{G=null;show("setup")};
 $("reroll").onclick=rollTask;
