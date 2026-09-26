@@ -1,0 +1,8 @@
+sound/
+*.mp3
+*.m4a
+*.wav
+*.aac
+*.ogg
+*.flac
+.DS_Store
