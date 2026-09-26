@@ -905,7 +905,7 @@ function phrasesFor(item){
   });
 }
 
-let rec=null,recActive=false,recFinal=0,recPending="",recRestarts=0,lastSpeechEvt=0,wdCount=0,voiceSince=0;
+let rec=null,recActive=false,recFinal=0,recPending="",recRestarts=0,recQuickFails=0,recLastErr="",lastSpeechEvt=0,wdCount=0,voiceSince=0;
 /* 診断表示：認識の状態と、いま判定を受け付けているか */
 function recStat(t,err){const el=$("recState");if(!el)return;el.textContent=t;el.classList.toggle("err",!!err)}
 function accStat(){const el=$("accState");if(!el)return;const on=!!(G&&G.hearing);el.textContent=on?"受付中":(G&&G.asked&&!G.lock?"読み上げ中（無視）":"待機");el.classList.toggle("on",on)}
@@ -914,6 +914,7 @@ function voiceOn(){return cfg.judge==="voice"&&SR&&!voiceBroken}
 function ensureRec(){
   if(!voiceOn()||rec)return;
   try{rec=new SR()}catch(e){voiceFail();return}
+  recLastErr="";
   rec.lang="ja-JP";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=5;recActive=true;recFinal=0;
   const local=useLocal();
   if(local){
@@ -923,7 +924,7 @@ function ensureRec(){
   }
   rec._where=local?"端末内":"クラウド";
   const r=rec;
-  r.onstart=()=>{recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中（"+r._where+"）")};
+  r.onstart=()=>{r._startAt=clock();recFinal=0;recPending="";if(G){G.base=0;G.prefix=""};recStat("認識：動作中（"+r._where+"）")};
   r.onaudiostart=()=>recStat("認識：マイク受信中");
   r.onspeechstart=()=>{lastSpeechEvt=clock();recStat("認識：声を検出")};
   r.onspeechend=()=>recStat("認識：マイク受信中");
@@ -967,12 +968,30 @@ function ensureRec(){
     const skip=t.length<2||FILLERS.some(x=>norm(x)===t)||clock()-(G.hearFrom||0)<0.35;
     if(!skip)G.answered=true;
   };
-  r.onerror=ev=>{recStat("エラー："+ev.error+"（"+r._where+"）",true);
+  r.onerror=ev=>{recLastErr=ev.error;recStat("エラー："+ev.error+"（"+r._where+"）",true);
     /* 端末内認識が使えないと分かったら、クラウドに切り替えて作り直す */
     if(r._where==="端末内"&&/language-not-supported|phrases-not-supported|service-not-allowed/.test(ev.error)){localBroken=true;localUI();recRefresh("端末内認識が使えないため、クラウドに切り替えました");return}if(ev.error==="not-allowed"||ev.error==="service-not-allowed"||ev.error==="audio-capture")voiceFail()};
   r.onend=()=>{
-    recRestarts++;recStat(`認識：停止→再開（${recRestarts}回目）`,true);
-    if(r===rec&&recActive&&voiceOn()&&G){try{r.start()}catch(e){recStat("認識：再開に失敗",true)}}
+    if(r!==rec||!recActive||!voiceOn()||!G)return;
+    recRestarts++;
+    /* 起動して1秒以内に止まったら「空回り」として数える */
+    const quick=!r._startAt||clock()-r._startAt<1.0;
+    recQuickFails=quick?recQuickFails+1:0;
+    const why=recLastErr?`・直前のエラー：${recLastErr}`:"";
+    /* 端末内認識で空回りが3回続いたら、クラウドに切り替える */
+    if(recQuickFails>=3&&r._where==="端末内"){
+      localBroken=true;localUI();recQuickFails=0;
+      recRefresh(`端末内認識が起動直後に止まるため、クラウドに切り替えました${why}`);return;
+    }
+    /* それでも空回りが6回続いたら、自動再開をやめる（次の判定のあとで作り直す） */
+    if(recQuickFails>=6){
+      recActive=false;rec=null;
+      recStat(`認識が起動直後に止まり続けています${why}。次の問題で再試行します`,true);return;
+    }
+    recStat(`認識：停止→再開（${recRestarts}回目${why}）`,true);
+    /* 空回りしているときは、間を空けて再開する（0.1秒→0.2秒→0.4秒…最大2秒） */
+    const wait=quick?Math.min(2000,100*Math.pow(2,recQuickFails-1)):0;
+    setTimeout(()=>{if(r===rec&&recActive&&G){try{r.start()}catch(e){recStat("認識：再開に失敗（"+(e&&e.name||"")+"）",true)}}},wait);
   };
   try{r.start()}catch(e){}
 }
