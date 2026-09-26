@@ -1130,7 +1130,7 @@ function localApi(){
 }
 function checkLocal(){
   const api=localApi();
-  if(!api){localState="unsupported";localUI();return}
+  if(!api){localState=SR?"unsupported":"nosr";localUI();return}
   localState="checking";localUI();
   Promise.resolve().then(api.check).then(v=>{localState=String(v||"unavailable");localUI()})
     .catch(()=>{localState="unavailable";localUI()});
@@ -1143,10 +1143,11 @@ function localUI(){
     available:"端末内の音声認識が使えます。通信なしで認識し、出題中の正解を優先して聞き取ります。",
     downloadable:"日本語の認識データを入れると、端末内で認識できます（初回のみダウンロード）。",
     downloading:"日本語の認識データをダウンロードしています…",
-    unavailable:"この端末では日本語の端末内認識が使えません。クラウドで認識します。",
-    unsupported:"このブラウザは端末内の音声認識に対応していません（Chrome 139 以降が必要）。クラウドで認識します。"};
+    unavailable:"この端末では日本語の端末内認識が使えません。ブラウザ標準の音声認識を使います。",
+    unsupported:"このブラウザは端末内認識の指定に対応していないため、ブラウザ標準の音声認識を使います（Safari では Apple の、Chrome では Google の仕組み）。",
+    nosr:"このブラウザは音声認識に対応していません。判定は「判定役が手動」で遊んでください。"};
   el.textContent=(M[localState]||("端末内認識の状態："+localState))+(localBroken?" 端末内認識でエラーが出たため、クラウドに切り替えました。":"");
-  if(cfg.recWhere!=="local")el.textContent="クラウド（Google のサーバー）で認識します。";
+  if(cfg.recWhere!=="local")el.textContent=SR?"ブラウザ標準の音声認識を使います（Chrome では Google のサーバー）。":"このブラウザは音声認識に対応していません。判定は「判定役が手動」で遊んでください。";
   btn.hidden=!(cfg.recWhere==="local"&&localState==="downloadable");
 }
 $("installBtn").onclick=()=>{
