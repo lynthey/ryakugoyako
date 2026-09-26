@@ -368,6 +368,9 @@ const Q=[
 ["ユニバ", "ユニバーサル・スタジオ・ジャパン", "e"],
 ["ピューロ", "サンリオピューロランド", "e"]
 ];
+/* 英語で認識されたときの別解（カタカナ語の正解に英語つづりを足す） */
+const EN={"スマホ": "smartphone|smart phone", "アプリ": "application", "インスタ": "instagram", "サブスク": "subscription", "コスパ": "cost performance", "タイパ": "time performance", "ワンチャン": "one chance", "パリピ": "party people", "ソシャゲ": "social game", "ネトゲ": "net game|online game", "メアド": "mail address|email address|e-mail address", "DM": "direct message", "ラスボス": "last boss", "ギャラ": "guarantee", "パソコン": "personal computer", "エアコン": "air conditioner", "リモコン": "remote controller|remote control", "デジカメ": "digital camera", "ワープロ": "word processor", "シャーペン": "sharp pencil", "ハンカチ": "handkerchief", "ラジカセ": "radio cassette recorder", "パトカー": "patrol car", "ガソスタ": "gasoline stand|gas station", "ゲーセン": "game center|game centre", "リストラ": "restructuring", "アポ": "appointment", "インフラ": "infrastructure", "セクハラ": "sexual harassment", "パワハラ": "power harassment", "ロケハン": "location hunting", "ワンオペ": "one operation", "エレキ": "electric guitar", "アメフト": "american football", "アニメ": "animation", "テレビ": "television", "コンビニ": "convenience store", "ファミレス": "family restaurant", "スタバ": "starbucks coffee|starbucks", "ミスド": "mister donut|mr donut", "ケンタ": "kentucky fried chicken|kentucky", "ロイホ": "royal host", "ファミマ": "family mart|familymart", "セブイレ": "seven eleven|7eleven", "ポテチ": "potato chips", "マヨ": "mayonnaise", "アイス": "ice cream", "オムライス": "omelette rice|omelet rice", "レモサワ": "lemon sour", "ポケモン": "pocket monsters|pocket monster", "ドラクエ": "dragon quest", "FF": "final fantasy", "マリカー": "mario kart", "スマブラ": "super smash bros|super smash brothers", "モンハン": "monster hunter", "ファミコン": "family computer", "ハリポタ": "harry potter", "ミスチル": "mr children|mister children", "ドリカム": "dreams come true", "サザン": "southern all stars", "ラルク": "larc en ciel", "Mステ": "music station", "USJ": "universal studios japan", "ユニバ": "universal studios japan", "TDL": "tokyo disneyland|tokyo disney land", "WHO": "world health organization", "JAL": "japan airlines", "ANA": "all nippon airways", "ユニクロ": "unique clothing warehouse", "カンペ": "cunning paper", "イントロ": "introduction", "エンタメ": "entertainment", "コスプレ": "costume play", "アコギ": "acoustic guitar", "リスケ": "reschedule", "シネコン": "cinema complex", "ゼネコン": "general contractor", "ワンセグ": "one segment", "グランピング": "glamorous camping", "アラサー": "around thirty", "プロレス": "professional wrestling", "リハビリ": "rehabilitation", "ステマ": "stealth marketing", "ネガキャン": "negative campaign", "リセマラ": "reset marathon", "アクスタ": "acrylic stand", "ブログ": "weblog|web log", "ディスる": "disrespect", "ビジュ": "visual", "ファンサ": "fan service", "エゴサ": "ego search|egosearch", "スクショ": "screenshot|screen shot", "リプ": "reply", "フォロバ": "follow back", "サブ垢": "sub account", "リムる": "remove", "リアタイ": "real time|realtime", "スパチャ": "super chat|superchat", "ボカロ": "vocaloid", "BFF": "best friend forever|best friends forever", "メモ": "memorandum", "デマ": "demagogy|demagoguery", "レジ": "cash register|register", "ボールペン": "ball point pen|ballpoint pen", "サックス": "saxophone", "ピアノ": "pianoforte|piano forte", "バス": "omnibus", "シュール": "surrealism", "サボる": "sabotage", "イケボ": "ikemen voice", "カワボ": "kawaii voice", "KY": "kuuki yomenai"};
+Q.forEach(q=>{if(EN[q[0]])q[1]+="|"+EN[q[0]]});
 const PENALTY=[
 "一発ギャグを全力で","変顔で記念撮影","好きな芸能人のモノマネ","次のゲームが終わるまで語尾を「〜でございます」に",
 "全員の良いところを1つずつ言う","最近あった恥ずかしい話を1つ","全員分の飲み物を注ぐ係","10秒間、全力の決めポーズ",
@@ -816,7 +819,13 @@ function disp(a){return a.split("|")[0]}
 function norm(t){
   return t.normalize("NFKC").toLowerCase()
     .replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60))
-    .replace(/[\sー\-‐－―・･、。,.!！?？「」『』()（）×~〜'"&＋+]/g,"");
+    .replace(/[\sー\-‐－―・･、。,.!！?？「」『』()（）×~〜'"&＋+]/g,"")
+    /* カタカナ語の表記ゆれをそろえる（フォン／ホン、ヴァ／バ、ウィ／ウイ など） */
+    .replace(/ゔぁ/g,"ば").replace(/ゔぃ/g,"び").replace(/ゔぇ/g,"べ").replace(/ゔぉ/g,"ぼ").replace(/ゔ/g,"ぶ")
+    .replace(/ふぁ/g,"は").replace(/ふぃ/g,"ひ").replace(/ふぇ/g,"へ").replace(/ふぉ/g,"ほ")
+    .replace(/てぃ/g,"ち").replace(/でぃ/g,"じ").replace(/とぅ/g,"つ").replace(/どぅ/g,"ず")
+    .replace(/ぢ/g,"じ").replace(/づ/g,"ず")
+    .replace(/[ぁぃぅぇぉ]/g,c=>({"ぁ":"あ","ぃ":"い","ぅ":"う","ぇ":"え","ぉ":"お"}[c]));
 }
 function variants(ans){
   const out=new Set();
@@ -889,7 +898,7 @@ $("installBtn").onclick=()=>{
 function phrasesFor(item){
   if(!item)return[];
   const out=new Set();
-  item[1].split("|").forEach(v=>{out.add(v.replace(/（[^）]*）/g,"").trim())});
+  item[1].split("|").filter(v=>!/^[\x00-\x7F]+$/.test(v)).forEach(v=>{out.add(v.replace(/（[^）]*）/g,"").trim())});
   return [...out].filter(Boolean).map(t=>{
     try{return typeof SpeechRecognitionPhrase==="function"?new SpeechRecognitionPhrase(t,6.0):{phrase:t,boost:6.0}}catch(e){return{phrase:t,boost:6.0}}
   });
