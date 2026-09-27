@@ -1079,6 +1079,8 @@ function rollTask(){$("task").textContent=PENALTY[Math.floor(Math.random()*PENAL
 function disp(a){return a.split("|")[0]}
 function norm(t){
   return t.normalize("NFKC").toLowerCase()
+    /* 「&」は「アンド」と読む（ジュディ＆マリー＝ジュディアンドマリー。記号を消すと略語と同じ文字になるため） */
+    .replace(/&/g,"アンド")
     .replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60))
     .replace(/[\sー\-‐－―・･、。,.!！?？「」『』()（）×~〜'"&＋+]/g,"")
     /* カタカナ語の表記ゆれをそろえる（フォン／ホン、ヴァ／バ、ウィ／ウイ など） */
