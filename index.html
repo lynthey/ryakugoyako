@@ -983,6 +983,8 @@ function depart(){
   stopSfx();endHearing();
   bgm.stop();G.lock=true;G.departing=true;
   $("who").textContent=G.station?"仕切り直し":"";$("abbr").textContent="発車";$("line").textContent="まもなく発車します（タップでスキップ）";
+  /* 上の駅番号と連続正解は、発車（ジングル）の時点で次の駅に合わせる。前のゲームの数字が残らないように */
+  $("stNo").textContent=G.station+1;$("streak").textContent=G.streak;
   $("prev").textContent="← "+G.prev;$("beats").hidden=true;$("heard").hidden=true;G.t0=null;G.nextCs=null;G.fresh=true;
   const g=G;
   playJingle().then(()=>{if(G===g&&g.departing){g.departing=false;nextQ()}});
