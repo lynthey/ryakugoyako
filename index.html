@@ -939,17 +939,22 @@ function familyOf(pool,key){
   return it=>it[2]===main;
 }
 /* ひっかけの塊：「揃い」を2〜3問続けて、最後に「外し」を1問。揃いが2問未満か、外しがないグループでは作らない */
+/* 出題数（この端末で判定まで進んだ回数）の少ない順に並べる。同じ回数どうしはランダム */
+function askedN(it){return ((stats[it[0]]||{}).n)||0}
+function byAsked(list){return shuffle(list.slice()).sort((a,b)=>askedN(a)-askedN(b))}
 function makeTrap(pool,key){
-  const inFam=familyOf(pool,key),same=shuffle(pool.filter(inFam)),odd=shuffle(pool.filter(it=>!inFam(it)));
+  const inFam=familyOf(pool,key),same=byAsked(pool.filter(inFam)),odd=byAsked(pool.filter(it=>!inFam(it)));
   if(same.length<2||!odd.length)return null;
   return [...same.slice(0,2+Math.floor(Math.random()*2)),odd[0]];
 }
-/* 出題順：基本は全問ランダム（ゴロのグループの語もバラバラに出る）。
-   10問に1回くらい、ゴロのグループの「揃い→外し」の塊を差し込む */
+/* 出題順：出題数の少ない問題から先に出す（同じ回数どうしはランダム）。ゲームをまたいでも偏らない。
+   ゴロのグループの語もふだんはバラバラに出て、10問に1回くらい「揃い→外し」の塊を差し込む */
 const TRAP_EVERY=10;
 function arrangeDeck(items){
   const byG={},used=new Set(),traps=[];
-  shuffle(items.slice()).forEach(it=>goroAll(it[0]).forEach(g=>(byG[g]=byG[g]||[]).push(it)));
+  /* ひっかけに使う語も、全体で一番少ない出題数＋1回までのものに限る（グループの語ばかり出ないように） */
+  const low=Math.min(...items.map(askedN))+1;
+  shuffle(items.filter(it=>askedN(it)<=low)).forEach(it=>goroAll(it[0]).forEach(g=>(byG[g]=byG[g]||[]).push(it)));
   const want=Math.floor(items.length/TRAP_EVERY);
   for(let made=true;traps.length<want&&made;){
     made=false;
@@ -959,7 +964,7 @@ function arrangeDeck(items){
       if(b){b.forEach(it=>used.add(it));traps.push(b);made=true}
     }
   }
-  const singles=shuffle(items.filter(it=>!used.has(it))),deck=[];
+  const singles=byAsked(items.filter(it=>!used.has(it))),deck=[];
   shuffle(traps).forEach(b=>{deck.push(...singles.splice(0,5+Math.floor(Math.random()*7)),...b)});
   return deck.concat(singles);
 }
