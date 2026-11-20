@@ -5,3 +5,4 @@ sound/_archive/
 *.ogg
 *.flac
 .DS_Store
+.claude/
